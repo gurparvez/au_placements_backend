@@ -1,6 +1,6 @@
-import { createServer } from "./server";
-import { connectDB } from "./config/database";
-import { CONFIG } from "./config/environment";
+import { connectDB } from './config/database';
+import { CONFIG } from './config/environment';
+import { createServer } from './server';
 
 const port = CONFIG.port;
 
@@ -14,7 +14,7 @@ async function bootstrap() {
       console.log(`🚀 Server running at http://localhost:${port}`);
     });
   } catch (error) {
-    console.error("❌ Failed to start server:", error);
+    console.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 }

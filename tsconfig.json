@@ -11,10 +11,10 @@
     "moduleResolution": "node",
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "baseUrl": "./src",  // Set baseUrl to src directory
+    "baseUrl": "./src", // Set baseUrl to src directory
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "**/*.test.ts"]
+  "exclude": ["node_modules", "**/*.test.ts"],
+  "include": ["src/**/*.ts"]
 }

@@ -1,8 +1,8 @@
-import mongoose, { Document, Schema } from 'mongoose'
+import mongoose, { Document, Schema } from 'mongoose';
 
 interface ICourse extends Document {
-  name: string
-  category: 'high_school' | 'ug' | 'pg' | 'diploma' | 'other'
+  name: string;
+  category: 'high_school' | 'ug' | 'pg' | 'diploma' | 'other';
 }
 
 const CourseSchema = new Schema<ICourse>(
@@ -15,8 +15,8 @@ const CourseSchema = new Schema<ICourse>(
     },
   },
   { timestamps: true }
-)
+);
 
-const Course = mongoose.model<ICourse>('Course', CourseSchema)
-export { Course }
-export type { ICourse }
+const Course = mongoose.model<ICourse>('Course', CourseSchema);
+export { Course };
+export type { ICourse };

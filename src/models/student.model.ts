@@ -1,57 +1,57 @@
-import mongoose, { Document, Schema, Types } from 'mongoose'
+import mongoose, { Document, Schema, Types } from 'mongoose';
 
 interface ICertificate {
-  name: string
-  issued_by: string
-  issue_date: Date
-  certificate_url: string
-  valid_until?: Date
+  name: string;
+  issued_by: string;
+  issue_date: Date;
+  certificate_url: string;
+  valid_until?: Date;
 }
 
 interface IExperience {
-  company: string
-  role: string
-  start_date: Date
-  end_date?: Date
-  description?: string // markdown
+  company: string;
+  role: string;
+  start_date: Date;
+  end_date?: Date;
+  description?: string; // markdown
 }
 
 interface IProject {
-  title: string
-  start_date: Date
-  end_date?: Date
-  on_going?: boolean
-  tech_used: Types.ObjectId[] // Skill references
-  code_url?: string
-  live_url?: string
-  description?: string
+  title: string;
+  start_date: Date;
+  end_date?: Date;
+  on_going?: boolean;
+  tech_used: Types.ObjectId[]; // Skill references
+  code_url?: string;
+  live_url?: string;
+  description?: string;
 }
 
 interface IEducation {
-  institute: string
-  from_date: Date
-  to_date: Date
-  course: Types.ObjectId // reference to Course
-  specialization?: string
+  institute: string;
+  from_date: Date;
+  to_date: Date;
+  course: Types.ObjectId; // reference to Course
+  specialization?: string;
 }
 
 interface IStudent extends Document {
-  user: Types.ObjectId
+  user: Types.ObjectId;
 
-  headline?: string
-  location: string
-  about?: string
+  headline?: string;
+  location: string;
+  about?: string;
 
-  linkedin_url?: string
-  github_url?: string
-  resume_link?: string
+  linkedin_url?: string;
+  github_url?: string;
+  resume_link?: string;
 
-  experience: IExperience[]
-  projects: IProject[]
-  certificates: ICertificate[]
+  experience: IExperience[];
+  projects: IProject[];
+  certificates: ICertificate[];
 
-  skills: Types.ObjectId[]
-  education: IEducation[]
+  skills: Types.ObjectId[];
+  education: IEducation[];
 }
 
 const CertificateSchema = new Schema<ICertificate>({
@@ -60,7 +60,7 @@ const CertificateSchema = new Schema<ICertificate>({
   issue_date: { type: Date, required: true },
   certificate_url: { type: String, required: true },
   valid_until: { type: Date },
-})
+});
 
 const ExperienceSchema = new Schema<IExperience>({
   company: { type: String, required: true },
@@ -68,7 +68,7 @@ const ExperienceSchema = new Schema<IExperience>({
   start_date: { type: Date, required: true },
   end_date: { type: Date },
   description: { type: String },
-})
+});
 
 const ProjectSchema = new Schema<IProject>({
   title: { type: String, required: true },
@@ -79,7 +79,7 @@ const ProjectSchema = new Schema<IProject>({
   code_url: String,
   live_url: String,
   description: String,
-})
+});
 
 const EducationSchema = new Schema<IEducation>({
   institute: { type: String, required: true },
@@ -87,7 +87,7 @@ const EducationSchema = new Schema<IEducation>({
   to_date: { type: Date, required: true },
   course: { type: Schema.Types.ObjectId, ref: 'Course', required: true },
   specialization: { type: String },
-})
+});
 
 const StudentSchema = new Schema<IStudent>(
   {
@@ -115,8 +115,8 @@ const StudentSchema = new Schema<IStudent>(
     education: [EducationSchema],
   },
   { timestamps: true }
-)
+);
 
-const Student = mongoose.model<IStudent>('Student', StudentSchema)
-export { Student }
-export type { IStudent }
+const Student = mongoose.model<IStudent>('Student', StudentSchema);
+export { Student };
+export type { IStudent };

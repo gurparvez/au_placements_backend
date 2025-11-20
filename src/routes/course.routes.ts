@@ -1,9 +1,9 @@
-import { Router } from 'express'
-import { addCourse, searchCourses } from '../controllers/course.controller'
+import { Router } from 'express';
+import { addCourse, searchCourses } from '../controllers/course.controller';
 
-const router = Router()
+const router = Router();
 
-router.post('/', addCourse)
-router.get('/search', searchCourses)
+router.post('/', addCourse);
+router.get('/search', searchCourses);
 
-export default router
+export default router;

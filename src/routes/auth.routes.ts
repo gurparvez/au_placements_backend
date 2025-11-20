@@ -1,9 +1,12 @@
-import { Router } from "express";
-import { registerUser, loginUser } from "../controllers/auth.controller";
+import { Router } from 'express';
+import multer from 'multer';
+import { loginUser, registerUser } from '../controllers/auth.controller';
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 const router = Router();
 
-router.post("/register", registerUser);
-router.post("/login", loginUser);
+router.post('/register', upload.single('id_card'), registerUser);
+router.post('/login', loginUser);
 
 export default router;

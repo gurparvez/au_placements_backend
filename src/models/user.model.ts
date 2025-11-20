@@ -1,19 +1,19 @@
-import bcrypt from 'bcrypt'
-import jwt, { Secret, SignOptions } from 'jsonwebtoken'
-import mongoose, { Document, Schema } from 'mongoose'
-import { ApiError } from '../utils/ApiError'
+import bcrypt from 'bcrypt';
+import jwt, { Secret, SignOptions } from 'jsonwebtoken';
+import mongoose, { Document, Schema } from 'mongoose';
+import { ApiError } from '../utils/ApiError';
 
 interface IUser extends Document {
-  auid: string
-  password: string
-  firstName: string
-  lastName: string
-  email: string
-  phone: string
-  roles: ('student' | 'admin')[]
+  auid: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  roles: ('student' | 'admin')[];
 
-  isPasswordCorrect(password: String): Promise<boolean>
-  accessToken(): String
+  isPasswordCorrect(password: String): Promise<boolean>;
+  accessToken(): String;
 }
 
 const userSchema: Schema = new Schema(
@@ -53,31 +53,35 @@ const userSchema: Schema = new Schema(
       enum: ['student', 'admin'],
       default: ['student'],
     },
+    verified: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
   }
-)
+);
 
 userSchema.pre<IUser>('save', async function (next) {
-  if (!this.isModified('password')) return next()
+  if (!this.isModified('password')) return next();
   try {
-    const salt = await bcrypt.genSalt(10)
-    this.password = await bcrypt.hash(this.password, salt)
-    next()
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
   } catch (err: any) {
-    next(err)
+    next(err);
   }
-})
+});
 userSchema.methods.accessToken = function (): string {
-  const secret: Secret | undefined = process.env.ACCESS_TOKEN_SECRET
+  const secret: Secret | undefined = process.env.ACCESS_TOKEN_SECRET;
   if (!secret) {
-    throw new ApiError(400, 'Failed to get secret from env file.')
+    throw new ApiError(400, 'Failed to get secret from env file.');
   }
 
   const options: SignOptions = {
     expiresIn: (process.env.ACCESS_TOKEN_EXPIRY as any) || 864000,
-  }
+  };
 
   return jwt.sign(
     {
@@ -86,14 +90,14 @@ userSchema.methods.accessToken = function (): string {
     },
     secret,
     options
-  )
-}
+  );
+};
 
 userSchema.methods.isPasswordCorrect = async function (password: string) {
-  return bcrypt.compare(password, this.password)
-}
+  return bcrypt.compare(password, this.password);
+};
 
-const User = mongoose.model<IUser>('User', userSchema)
+const User = mongoose.model<IUser>('User', userSchema);
 
-export { User }
-export type { IUser }
+export { User };
+export type { IUser };

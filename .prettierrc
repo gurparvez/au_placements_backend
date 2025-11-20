@@ -1,8 +1,8 @@
 {
-  "singleQuote": true,
-  "semi": false,
-  "trailingComma": "es5",
-  "tabWidth": 2,
+  "plugins": ["prettier-plugin-organize-imports", "prettier-plugin-sort-json"],
   "printWidth": 100,
-  "plugins": ["prettier-plugin-organize-imports", "prettier-plugin-sort-json"]
+  "semi": true,
+  "singleQuote": true,
+  "tabWidth": 2,
+  "trailingComma": "es5"
 }

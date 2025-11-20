@@ -1,9 +1,9 @@
-import { Router } from 'express'
-import { addSkill, searchSkills } from '../controllers/skill.controller'
+import { Router } from 'express';
+import { addSkill, searchSkills } from '../controllers/skill.controller';
 
-const router = Router()
+const router = Router();
 
-router.post('/', addSkill)
-router.get('/search', searchSkills)
+router.post('/', addSkill);
+router.get('/search', searchSkills);
 
-export default router
+export default router;
