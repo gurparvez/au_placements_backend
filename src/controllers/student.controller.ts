@@ -3,22 +3,35 @@ import { Student } from '../models/student.model';
 
 export const createStudentProfile = async (req: Request, res: Response) => {
   try {
-    const userId = res.locals.user; // coming from auth middleware
+    const user = res.locals.user;
 
-    const studentExists = await Student.findOne({ user: userId });
-    if (studentExists) return res.status(400).json({ error: 'Profile already exists' });
+    // Ensure profile doesn't already exist.
+    const existing = await Student.findOne({ user: user._id });
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message: "A profile already exists for this user."
+      });
+    }
+
+    delete req.body.user;
 
     const profile = await Student.create({
-      user: userId,
-      location: req.body.location,
-      ...req.body,
+      user: user._id,        // ALWAYS enforced by backend
+      ...req.body
     });
 
-    res.status(201).json(profile);
+    res.status(201).json({
+      success: true,
+      profile
+    });
+
   } catch (err) {
-    res.status(500).json({ error: 'Failed to create profile' });
+    console.log("createStudentProfile ERROR:", err);
+    res.status(500).json({ success: false, message: "Failed to create profile" });
   }
 };
+
 
 export const getStudentProfile = async (req: Request, res: Response) => {
   try {
@@ -34,9 +47,10 @@ export const getStudentProfile = async (req: Request, res: Response) => {
   }
 };
 
+
 export const updateStudentProfile = async (req: Request, res: Response) => {
   try {
-    const userId = res.locals.user;
+    const userId = res.locals.user._id;
 
     const updated = await Student.findOneAndUpdate(
       { user: userId },
@@ -46,6 +60,7 @@ export const updateStudentProfile = async (req: Request, res: Response) => {
 
     res.json(updated);
   } catch (err) {
+    console.log('updateStudentProfile ERROR:', err);
     res.status(500).json({ error: 'Failed to update profile' });
   }
 };

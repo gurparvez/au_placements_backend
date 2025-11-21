@@ -1,4 +1,6 @@
-import mongoose, { Document, Schema, Types } from 'mongoose';
+import mongoose, { Document, Schema, Types } from "mongoose";
+
+/* ---------------------- Interfaces ---------------------- */
 
 interface ICertificate {
   name: string;
@@ -46,13 +48,19 @@ interface IStudent extends Document {
   github_url?: string;
   resume_link?: string;
 
+  looking_for: ("internship" | "job")[];
+
   experience: IExperience[];
+  total_experience: number; // months
+
   projects: IProject[];
   certificates: ICertificate[];
 
   skills: Types.ObjectId[];
   education: IEducation[];
 }
+
+/* ---------------------- Sub Schemas ---------------------- */
 
 const CertificateSchema = new Schema<ICertificate>({
   name: { type: String, required: true },
@@ -75,7 +83,7 @@ const ProjectSchema = new Schema<IProject>({
   start_date: { type: Date, required: true },
   end_date: { type: Date },
   on_going: { type: Boolean, default: false },
-  tech_used: [{ type: Schema.Types.ObjectId, ref: 'Skill' }],
+  tech_used: [{ type: Schema.Types.ObjectId, ref: "Skill" }],
   code_url: String,
   live_url: String,
   description: String,
@@ -85,15 +93,17 @@ const EducationSchema = new Schema<IEducation>({
   institute: { type: String, required: true },
   from_date: { type: Date, required: true },
   to_date: { type: Date, required: true },
-  course: { type: Schema.Types.ObjectId, ref: 'Course', required: true },
+  course: { type: Schema.Types.ObjectId, ref: "Course", required: true },
   specialization: { type: String },
 });
+
+/* ---------------------- Student Schema ---------------------- */
 
 const StudentSchema = new Schema<IStudent>(
   {
     user: {
       type: Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       required: true,
       unique: true,
       index: true,
@@ -107,16 +117,64 @@ const StudentSchema = new Schema<IStudent>(
     github_url: String,
     resume_link: String,
 
+    looking_for: {
+      type: [String],
+      enum: ["internship", "job"],
+      default: [],
+    },
+
     experience: [ExperienceSchema],
+    total_experience: { type: Number, default: 0 }, // months
+
     projects: [ProjectSchema],
     certificates: [CertificateSchema],
 
-    skills: [{ type: Schema.Types.ObjectId, ref: 'Skill' }],
+    skills: [{ type: Schema.Types.ObjectId, ref: "Skill" }],
     education: [EducationSchema],
   },
   { timestamps: true }
 );
 
-const Student = mongoose.model<IStudent>('Student', StudentSchema);
+/* ---------------------- Experience Auto Calculation ---------------------- */
+
+function calculateTotalExperience(experiences: IExperience[]): number {
+  if (!experiences || experiences.length === 0) return 0;
+
+  let totalMonths = 0;
+
+  experiences.forEach((exp) => {
+    const start = new Date(exp.start_date);
+    const end = exp.end_date ? new Date(exp.end_date) : new Date();
+
+    const months =
+      (end.getFullYear() - start.getFullYear()) * 12 +
+      (end.getMonth() - start.getMonth());
+
+    if (months > 0) totalMonths += months;
+  });
+
+  return totalMonths;
+}
+
+// Pre-save hook
+StudentSchema.pre("save", function (next) {
+  this.total_experience = calculateTotalExperience(this.experience);
+  next();
+});
+
+// Pre-update hook (important for PUT/PATCH operations)
+StudentSchema.pre("findOneAndUpdate", function (next) {
+  const update = this.getUpdate() as any;
+
+  if (update.experience) {
+    update.total_experience = calculateTotalExperience(update.experience);
+  }
+
+  next();
+});
+
+/* ---------------------- Model Export ---------------------- */
+
+const Student = mongoose.model<IStudent>("Student", StudentSchema);
 export { Student };
 export type { IStudent };
