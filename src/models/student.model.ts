@@ -43,6 +43,7 @@ interface IStudent extends Document {
   headline?: string;
   location: string;
   about?: string;
+  profile_image?: string;
 
   linkedin_url?: string;
   github_url?: string;
@@ -112,6 +113,7 @@ const StudentSchema = new Schema<IStudent>(
     headline: String,
     location: { type: String, required: true },
     about: String,
+    profile_image: { type: String },
 
     linkedin_url: String,
     github_url: String,
