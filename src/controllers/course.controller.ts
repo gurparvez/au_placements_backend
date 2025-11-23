@@ -30,3 +30,12 @@ export const searchCourses = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to fetch courses' });
   }
 };
+
+export const getAllCourses = async (req: Request, res: Response) => {
+  try {
+    const courses = await Course.find({});
+    res.json({ success: true, courses });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch courses" });
+  }
+};

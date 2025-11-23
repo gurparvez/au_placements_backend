@@ -31,3 +31,12 @@ export const searchSkills = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to fetch skills' });
   }
 };
+
+export const getAllSkills = async (req: Request, res: Response) => {
+  try {
+    const skills = await Skill.find({});
+    res.json({ success: true, skills });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch skills" });
+  }
+};
