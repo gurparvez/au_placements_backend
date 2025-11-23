@@ -145,8 +145,8 @@ export const updateStudentProfile = async (req: Request, res: Response) => {
 export const getAllStudents = async (req: Request, res: Response) => {
   try {
     const students = await Student.find({})
-      .select("headline location skills projects profile_image user")
       .populate("skills")
+      .populate("education.course")
       .populate("user", "firstName lastName auid");
 
     res.json({ success: true, students });
