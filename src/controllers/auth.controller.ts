@@ -102,3 +102,22 @@ export const logoutUser = (req: Request, res: Response) => {
 
   res.json({ success: true, message: "Logged out successfully" });
 };
+
+export const getUser = asyncHandler(async (req: Request, res: Response) => {
+  const user = res.locals.user; // Comes from verifyJwt
+
+  if (!user) {
+    return res.status(401).json({ success: false, message: "Not authenticated" });
+  }
+
+  res.json({
+    success: true,
+    user: {
+      _id: user._id,
+      auid: user.auid,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      roles: user.roles,
+    },
+  });
+});
