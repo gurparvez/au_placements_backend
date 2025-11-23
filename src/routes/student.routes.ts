@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   createStudentProfile,
   getAllStudents,
+  getAnyStudentProfile,
   getStudentProfile,
   updateStudentProfile,
 } from '../controllers/student.controller';
@@ -14,5 +15,6 @@ router.post('/', verifyJwt, upload.single("profile_image"), createStudentProfile
 router.get('/', verifyJwt, getStudentProfile);
 router.put('/', verifyJwt, upload.single("profile_image"), updateStudentProfile);
 router.get("/all", getAllStudents); // public route
+router.get('/profile', getAnyStudentProfile); // public route
 
 export default router;

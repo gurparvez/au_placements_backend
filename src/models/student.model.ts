@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema, Types } from "mongoose";
+import mongoose, { Document, Schema, Types } from 'mongoose';
 
 /* ---------------------- Interfaces ---------------------- */
 
@@ -6,7 +6,7 @@ interface ICertificate {
   name: string;
   issued_by: string;
   issue_date: Date;
-  certificate_url: string;
+  certificate_url?: string; // 🔵 optional now
   valid_until?: Date;
 }
 
@@ -15,7 +15,7 @@ interface IExperience {
   role: string;
   start_date: Date;
   end_date?: Date;
-  description?: string; // markdown
+  description?: string;
 }
 
 interface IProject {
@@ -23,7 +23,7 @@ interface IProject {
   start_date: Date;
   end_date?: Date;
   on_going?: boolean;
-  tech_used: Types.ObjectId[]; // Skill references
+  tech_used: Types.ObjectId[];
   code_url?: string;
   live_url?: string;
   description?: string;
@@ -33,7 +33,7 @@ interface IEducation {
   institute: string;
   from_date: Date;
   to_date: Date;
-  course: Types.ObjectId; // reference to Course
+  course: Types.ObjectId;
   specialization?: string;
 }
 
@@ -49,16 +49,16 @@ interface IStudent extends Document {
   github_url?: string;
   resume_link?: string;
 
-  looking_for: ("internship" | "job")[];
+  looking_for?: ('internship' | 'job')[]; // 🔵 optional
 
-  experience: IExperience[];
-  total_experience: number; // months
+  experience?: IExperience[]; // 🔵 optional
+  total_experience: number;
 
-  projects: IProject[];
-  certificates: ICertificate[];
+  projects?: IProject[]; // 🔵 optional
+  certificates?: ICertificate[]; // 🔵 optional
 
-  skills: Types.ObjectId[];
-  education: IEducation[];
+  skills?: Types.ObjectId[];
+  education?: IEducation[];
 }
 
 /* ---------------------- Sub Schemas ---------------------- */
@@ -67,7 +67,7 @@ const CertificateSchema = new Schema<ICertificate>({
   name: { type: String, required: true },
   issued_by: { type: String, required: true },
   issue_date: { type: Date, required: true },
-  certificate_url: { type: String, required: true },
+  certificate_url: { type: String }, // 🔵 no longer required
   valid_until: { type: Date },
 });
 
@@ -84,7 +84,7 @@ const ProjectSchema = new Schema<IProject>({
   start_date: { type: Date, required: true },
   end_date: { type: Date },
   on_going: { type: Boolean, default: false },
-  tech_used: [{ type: Schema.Types.ObjectId, ref: "Skill" }],
+  tech_used: [{ type: Schema.Types.ObjectId, ref: 'Skill' }],
   code_url: String,
   live_url: String,
   description: String,
@@ -94,7 +94,7 @@ const EducationSchema = new Schema<IEducation>({
   institute: { type: String, required: true },
   from_date: { type: Date, required: true },
   to_date: { type: Date, required: true },
-  course: { type: Schema.Types.ObjectId, ref: "Course", required: true },
+  course: { type: Schema.Types.ObjectId, ref: 'Course', required: true },
   specialization: { type: String },
 });
 
@@ -104,7 +104,7 @@ const StudentSchema = new Schema<IStudent>(
   {
     user: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
       unique: true,
       index: true,
@@ -113,7 +113,7 @@ const StudentSchema = new Schema<IStudent>(
     headline: String,
     location: { type: String, required: true },
     about: String,
-    profile_image: { type: String },
+    profile_image: String,
 
     linkedin_url: String,
     github_url: String,
@@ -121,25 +121,25 @@ const StudentSchema = new Schema<IStudent>(
 
     looking_for: {
       type: [String],
-      enum: ["internship", "job"],
-      default: [],
+      enum: ['internship', 'job'],
+      default: [], // 🔵 empty allowed
     },
 
-    experience: [ExperienceSchema],
-    total_experience: { type: Number, default: 0 }, // months
+    experience: { type: [ExperienceSchema], default: [] }, // 🔵 optional
+    total_experience: { type: Number, default: 0 },
 
-    projects: [ProjectSchema],
-    certificates: [CertificateSchema],
+    projects: { type: [ProjectSchema], default: [] }, // 🔵 optional
+    certificates: { type: [CertificateSchema], default: [] }, // 🔵 optional
 
-    skills: [{ type: Schema.Types.ObjectId, ref: "Skill" }],
-    education: [EducationSchema],
+    skills: [{ type: Schema.Types.ObjectId, ref: 'Skill', default: [] }],
+    education: { type: [EducationSchema], default: [] },
   },
   { timestamps: true }
 );
 
 /* ---------------------- Experience Auto Calculation ---------------------- */
 
-function calculateTotalExperience(experiences: IExperience[]): number {
+function calculateTotalExperience(experiences?: IExperience[]): number {
   if (!experiences || experiences.length === 0) return 0;
 
   let totalMonths = 0;
@@ -149,8 +149,7 @@ function calculateTotalExperience(experiences: IExperience[]): number {
     const end = exp.end_date ? new Date(exp.end_date) : new Date();
 
     const months =
-      (end.getFullYear() - start.getFullYear()) * 12 +
-      (end.getMonth() - start.getMonth());
+      (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
 
     if (months > 0) totalMonths += months;
   });
@@ -159,13 +158,13 @@ function calculateTotalExperience(experiences: IExperience[]): number {
 }
 
 // Pre-save hook
-StudentSchema.pre("save", function (next) {
+StudentSchema.pre('save', function (next) {
   this.total_experience = calculateTotalExperience(this.experience);
   next();
 });
 
 // Pre-update hook (important for PUT/PATCH operations)
-StudentSchema.pre("findOneAndUpdate", function (next) {
+StudentSchema.pre('findOneAndUpdate', function (next) {
   const update = this.getUpdate() as any;
 
   if (update.experience) {
@@ -177,6 +176,6 @@ StudentSchema.pre("findOneAndUpdate", function (next) {
 
 /* ---------------------- Model Export ---------------------- */
 
-const Student = mongoose.model<IStudent>("Student", StudentSchema);
+const Student = mongoose.model<IStudent>('Student', StudentSchema);
 export { Student };
 export type { IStudent };

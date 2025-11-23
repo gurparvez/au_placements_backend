@@ -59,6 +59,33 @@ export const getStudentProfile = async (req: Request, res: Response) => {
   }
 };
 
+export const getAnyStudentProfile = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId || typeof userId !== "string") {
+      return res.status(400).json({ error: "userId (string) is required in query params" });
+    }
+
+    const profile = await Student.findOne({ user: userId })
+      .populate("skills")
+      .populate("education.course");
+
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    res.json({
+      success: true,
+      profile,
+    });
+
+  } catch (err) {
+    console.log("getAnyStudentProfile ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch profile" });
+  }
+};
+
 export const updateStudentProfile = async (req: Request, res: Response) => {
   console.log('--- START UPDATE PROFILE REQUEST ---'); // Checkpoint A
   try {
