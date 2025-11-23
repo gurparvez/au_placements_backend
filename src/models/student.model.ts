@@ -49,13 +49,14 @@ interface IStudent extends Document {
   github_url?: string;
   resume_link?: string;
 
-  looking_for?: ('internship' | 'job')[]; // 🔵 optional
+  preferred_field?: string;
+  looking_for?: ('internship' | 'job')[];
 
-  experience?: IExperience[]; // 🔵 optional
+  experience?: IExperience[];
   total_experience: number;
 
-  projects?: IProject[]; // 🔵 optional
-  certificates?: ICertificate[]; // 🔵 optional
+  projects?: IProject[];
+  certificates?: ICertificate[];
 
   skills?: Types.ObjectId[];
   education?: IEducation[];
@@ -114,6 +115,7 @@ const StudentSchema = new Schema<IStudent>(
     location: { type: String, required: true },
     about: String,
     profile_image: String,
+    preferred_field: { type: String },
 
     linkedin_url: String,
     github_url: String,
