@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Student } from '../models/student.model';
 import { uploadToCloudinary } from '../utils/uploadToCloudinary';
+import { User } from '../models/user.model';
 
 export const createStudentProfile = async (req: Request, res: Response) => {
   try {
@@ -67,6 +68,7 @@ export const getAnyStudentProfile = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "userId (string) is required in query params" });
     }
 
+    // Fetch student profile
     const profile = await Student.findOne({ user: userId })
       .populate("skills")
       .populate("education.course");
@@ -75,8 +77,14 @@ export const getAnyStudentProfile = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Profile not found" });
     }
 
+    // Fetch full user info
+    const user = await User.findById(userId).select(
+      "-password -__v" // hide sensitive fields
+    );
+
     res.json({
       success: true,
+      user,
       profile,
     });
 
