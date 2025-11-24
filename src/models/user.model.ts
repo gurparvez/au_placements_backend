@@ -80,7 +80,7 @@ userSchema.methods.accessToken = function (): string {
   }
 
   const options: SignOptions = {
-    expiresIn: (process.env.ACCESS_TOKEN_EXPIRY as any) || 864000,
+    expiresIn: Number(process.env.ACCESS_TOKEN_EXPIRY) || 864000,
   };
 
   return jwt.sign(
