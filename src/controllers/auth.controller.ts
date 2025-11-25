@@ -94,6 +94,70 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
   });
 });
 
+export const updateUserInfo = asyncHandler(async (req: Request, res: Response) => {
+  const user = res.locals.user; // authenticated user
+
+  if (!user) throw new ApiError(401, "Unauthorized");
+
+  const { firstName, lastName, email, phone } = req.body;
+
+  const updated = await User.findByIdAndUpdate(
+    user._id,
+    {
+      $set: {
+        ...(firstName && { firstName }),
+        ...(lastName && { lastName }),
+        ...(email && { email }),
+        ...(phone && { phone }),
+      }
+    },
+    { new: true }
+  );
+
+  res.json({
+    success: true,
+    message: "User info updated",
+    user: {
+      _id: updated?._id,
+      auid: updated?.auid,
+      firstName: updated?.firstName,
+      lastName: updated?.lastName,
+      email: updated?.email,
+      phone: updated?.phone,
+      roles: updated?.roles,
+    }
+  });
+});
+
+export const updatePassword = asyncHandler(async (req: Request, res: Response) => {
+  const user = res.locals.user;
+
+  if (!user) throw new ApiError(401, "Unauthorized");
+
+  const { oldPassword, newPassword } = req.body;
+
+  if (!oldPassword || !newPassword) {
+    throw new ApiError(400, "oldPassword and newPassword are required");
+  }
+
+  const dbUser = await User.findById(user._id);
+
+  if (!dbUser) throw new ApiError(404, "User not found");
+
+  // Compare passwords
+  const isCorrect = await dbUser.isPasswordCorrect(oldPassword);
+  if (!isCorrect) throw new ApiError(401, "Old password is incorrect");
+
+  // Set new password (mongoose pre-save hook will hash it)
+  dbUser.password = newPassword;
+  await dbUser.save();
+
+  res.json({
+    success: true,
+    message: "Password updated successfully"
+  });
+});
+
 export const logoutUser = (req: Request, res: Response) => {
   res.clearCookie("token", {
     httpOnly: true,
