@@ -181,6 +181,8 @@ export const getUser = asyncHandler(async (req: Request, res: Response) => {
       auid: user.auid,
       firstName: user.firstName,
       lastName: user.lastName,
+      email: user.email,
+      phone: user.phone,
       roles: user.roles,
     },
   });
