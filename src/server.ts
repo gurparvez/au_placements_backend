@@ -15,7 +15,7 @@ export function createServer() {
         "http://localhost:3000",          // React local
         "http://localhost:5173",          // Vite
         "http://localhost:8000",          // Postman
-        "https://your-frontend.vercel.app" // Production frontend
+        "https://au-placements.vercel.app" // Production frontend
       ],
       credentials: true,
     })
