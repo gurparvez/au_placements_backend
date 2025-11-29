@@ -10,6 +10,9 @@ interface IUser extends Document {
   lastName: string;
   email: string;
   phone: string;
+
+  university: 'Akal University' | 'Eternal University';
+
   roles: ('student' | 'admin')[];
 
   isPasswordCorrect(password: String): Promise<boolean>;
@@ -48,6 +51,13 @@ const userSchema: Schema = new Schema(
       required: false,
       unique: true,
     },
+
+    university: {
+      type: String,
+      enum: ['Akal University', 'Eternal University'],
+      required: true,
+    },
+
     roles: {
       type: [String],
       enum: ['student', 'admin'],
@@ -73,6 +83,7 @@ userSchema.pre<IUser>('save', async function (next) {
     next(err);
   }
 });
+
 userSchema.methods.accessToken = function (): string {
   const secret: Secret | undefined = process.env.ACCESS_TOKEN_SECRET;
   if (!secret) {
@@ -87,6 +98,7 @@ userSchema.methods.accessToken = function (): string {
     {
       _id: this._id,
       roles: this.roles,
+      university: this.university, // Optional: useful to have university in the token payload
     },
     secret,
     options
