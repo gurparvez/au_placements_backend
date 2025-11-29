@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { Student } from '../models/student.model';
-import { uploadToCloudinary } from '../utils/uploadToCloudinary';
 import { User } from '../models/user.model';
+import { uploadToCloudinary } from '../utils/uploadToCloudinary';
 
 export const createStudentProfile = async (req: Request, res: Response) => {
   try {
@@ -15,37 +15,52 @@ export const createStudentProfile = async (req: Request, res: Response) => {
       });
     }
 
+    // Initialize studentData from body
+    const studentData = { ...req.body };
+
     /* -------------------------------------------------------------------------- */
-    /* IMAGE UPLOAD                                 */
+    /* FILE UPLOADS (Image & Resume)                                            */
     /* -------------------------------------------------------------------------- */
-    let profileImageUrl = '';
 
-    if (req.file) {
-      console.log('File received in memory. Size:', req.file.size);
+    // Cast req.files to the specific Multer type for multiple fields
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
 
-      const uploaded: any = await uploadToCloudinary(
-        req.file.buffer,
-        'students/profile_images'
-      );
+    // 1. Handle Profile Image
+    if (files && files['profile_image'] && files['profile_image'][0]) {
+      const imageFile = files['profile_image'][0];
+      console.log('Image received:', imageFile.originalname, imageFile.size);
 
-      console.log('Cloudinary upload complete:', uploaded?.public_id);
-      profileImageUrl = uploaded.secure_url;
+      const uploaded: any = await uploadToCloudinary(imageFile.buffer, 'students/profile_images');
+
+      studentData.profile_image = uploaded.secure_url;
+    }
+
+    // 2. Handle Resume
+    if (files && files['resume'] && files['resume'][0]) {
+      const resumeFile = files['resume'][0];
+      console.log('Resume received:', resumeFile.originalname, resumeFile.size);
+
+      // Upload to a different folder, e.g., 'students/resumes'
+      // Note: Cloudinary handles PDFs automatically.
+      // If you are uploading .doc/.docx, Cloudinary accepts them as "raw" files usually.
+      const uploaded: any = await uploadToCloudinary(resumeFile.buffer, 'students/resumes');
+
+      // Save the URL into the resume_link field
+      studentData.resume_link = uploaded.secure_url;
     }
 
     /* -------------------------------------------------------------------------- */
-    /* PARSE JSON STRINGS FROM BODY                       */
+    /* PARSE JSON STRINGS FROM BODY                                             */
     /* -------------------------------------------------------------------------- */
-    // FormData sends arrays/objects as JSON strings (e.g. "[{...}]"). 
-    // We must parse them back to objects for Mongoose.
-    
-    const studentData = { ...req.body };
+    // Since we are using FormData, complex fields come in as JSON strings.
+
     const fieldsToParse = [
-      'education', 
-      'experience', 
-      'projects', 
-      'certificates', 
-      'skills', 
-      'looking_for'
+      'education',
+      'experience',
+      'projects',
+      'certificates',
+      'skills',
+      'looking_for',
     ];
 
     fieldsToParse.forEach((field) => {
@@ -54,19 +69,19 @@ export const createStudentProfile = async (req: Request, res: Response) => {
           studentData[field] = JSON.parse(studentData[field]);
         } catch (error) {
           console.error(`Error parsing field ${field}:`, error);
-          // If parsing fails, we leave it as is; Mongoose will throw a validation error.
+          // Allow Mongoose validation to catch invalid structures later
         }
       }
     });
 
     /* -------------------------------------------------------------------------- */
-    /* CREATE PROFILE                               */
+    /* CREATE PROFILE                                                           */
     /* -------------------------------------------------------------------------- */
 
     const profile = await Student.create({
       user: user._id,
-      profile_image: profileImageUrl || undefined,
-      ...studentData, // <--- Use the parsed data here
+      ...studentData,
+      // profile_image and resume_link are now merged into studentData if uploads occurred
     });
 
     res.status(201).json({
@@ -97,22 +112,22 @@ export const getAnyStudentProfile = async (req: Request, res: Response) => {
   try {
     const { userId } = req.query;
 
-    if (!userId || typeof userId !== "string") {
-      return res.status(400).json({ error: "userId (string) is required in query params" });
+    if (!userId || typeof userId !== 'string') {
+      return res.status(400).json({ error: 'userId (string) is required in query params' });
     }
 
     // Fetch student profile
     const profile = await Student.findOne({ user: userId })
-      .populate("skills")
-      .populate("education.course");
+      .populate('skills')
+      .populate('education.course');
 
     if (!profile) {
-      return res.status(404).json({ error: "Profile not found" });
+      return res.status(404).json({ error: 'Profile not found' });
     }
 
     // Fetch full user info
     const user = await User.findById(userId).select(
-      "-password -__v" // hide sensitive fields
+      '-password -__v' // hide sensitive fields
     );
 
     res.json({
@@ -120,10 +135,9 @@ export const getAnyStudentProfile = async (req: Request, res: Response) => {
       user,
       profile,
     });
-
   } catch (err) {
-    console.log("getAnyStudentProfile ERROR:", err);
-    res.status(500).json({ error: "Failed to fetch profile" });
+    console.log('getAnyStudentProfile ERROR:', err);
+    res.status(500).json({ error: 'Failed to fetch profile' });
   }
 };
 
@@ -133,31 +147,48 @@ export const updateStudentProfile = async (req: Request, res: Response) => {
     const user = res.locals.user;
     console.log('STEP 1: User ID found:', user?._id);
 
-    /* -------------------------------------------------------------------------- */
-    /* 1. HANDLE IMAGE UPLOAD (If a new file exists)                              */
-    /* -------------------------------------------------------------------------- */
-    let profileImageUrl;
+    // Initialize updateData from body (cloned)
+    const updateData: any = { ...req.body };
 
-    if (req.file) {
-      console.log('File received in memory. Size:', req.file.size);
+    /* -------------------------------------------------------------------------- */
+    /* 1. HANDLE FILE UPLOADS (Image & Resume)                                  */
+    /* -------------------------------------------------------------------------- */
+    
+    // Cast req.files to handle multiple fields
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+
+    // A. Handle Profile Image
+    if (files && files['profile_image'] && files['profile_image'][0]) {
+      const imageFile = files['profile_image'][0];
+      console.log('Profile Image received. Size:', imageFile.size);
 
       const uploaded: any = await uploadToCloudinary(
-        req.file.buffer,
+        imageFile.buffer, 
         'students/profile_images'
       );
 
-      console.log('Cloudinary upload complete:', uploaded?.public_id);
-      profileImageUrl = uploaded.secure_url;
-    } else {
-      console.log('STEP 2: No new file uploaded, skipping Cloudinary.');
+      console.log('Image Cloudinary upload complete:', uploaded?.public_id);
+      updateData.profile_image = uploaded.secure_url;
+    }
+
+    // B. Handle Resume
+    if (files && files['resume'] && files['resume'][0]) {
+      const resumeFile = files['resume'][0];
+      console.log('Resume received. Size:', resumeFile.size);
+
+      const uploaded: any = await uploadToCloudinary(
+        resumeFile.buffer, 
+        'students/resumes'
+      );
+
+      console.log('Resume Cloudinary upload complete:', uploaded?.public_id);
+      updateData.resume_link = uploaded.secure_url;
     }
 
     /* -------------------------------------------------------------------------- */
-    /* 2. PARSE JSON STRINGS (Fix for FormData "CastError")                       */
+    /* 2. PARSE JSON STRINGS (Fix for FormData "CastError")                     */
     /* -------------------------------------------------------------------------- */
-    // Clone body so we can modify it
-    const updateData: any = { ...req.body };
-
+    
     const fieldsToParse = [
       'education',
       'experience',
@@ -174,24 +205,19 @@ export const updateStudentProfile = async (req: Request, res: Response) => {
           updateData[field] = JSON.parse(updateData[field]);
         } catch (error) {
           console.error(`Error parsing field ${field}:`, error);
-          // We catch here so we don't crash everything, 
+          // We catch here so we don't crash everything,
           // but Mongoose might still throw validation error if data is bad.
         }
       }
     });
 
-    // If a new image was uploaded, override the old one
-    if (profileImageUrl) {
-      updateData.profile_image = profileImageUrl;
-    }
-
     /* -------------------------------------------------------------------------- */
-    /* 3. UPDATE MONGODB                                                          */
+    /* 3. UPDATE MONGODB                                                        */
     /* -------------------------------------------------------------------------- */
     console.log('STEP 5: Updating MongoDB...');
 
     // $set: updateData will replace the fields provided in updateData.
-    // Since we parsed the arrays, Mongoose will correctly save them as arrays.
+    // Mongoose will correctly save the parsed arrays/objects.
     const updated = await Student.findOneAndUpdate(
       { user: user._id },
       { $set: updateData },
@@ -209,7 +235,7 @@ export const updateStudentProfile = async (req: Request, res: Response) => {
     // FORCE ERROR TO PRINT
     console.error('!!! CRITICAL ERROR CAUGHT !!!');
     console.error('Error Message:', err.message);
-    
+
     // Often Mongoose errors are inside err.errors, so printing the whole obj helps
     console.error('Full Error Object:', JSON.stringify(err, null, 2));
 
@@ -220,12 +246,12 @@ export const updateStudentProfile = async (req: Request, res: Response) => {
 export const getAllStudents = async (req: Request, res: Response) => {
   try {
     const students = await Student.find({})
-      .populate("skills")
-      .populate("education.course")
-      .populate("user", "firstName lastName auid");
+      .populate('skills')
+      .populate('education.course')
+      .populate('user', 'firstName lastName auid');
 
     res.json({ success: true, students });
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch students" });
+    res.status(500).json({ error: 'Failed to fetch students' });
   }
 };
