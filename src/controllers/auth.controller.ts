@@ -4,6 +4,10 @@ import { ApiError } from '../utils/ApiError';
 import { asyncHandler } from '../utils/handler';
 import { verifyIdCard } from '../utils/verifyIdCard';
 
+// src/controllers/authController.ts
+
+// ... imports
+
 export const registerUser = asyncHandler(async (req: Request, res: Response) => {
   const { auid, password, firstName, lastName, email, phone, roles, university } = req.body;
 
@@ -14,7 +18,6 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
     );
   }
 
-  // Already existing?
   const existing = await User.findOne({ auid });
   if (existing) throw new ApiError(409, 'User with this AUID already exists.');
 
@@ -22,7 +25,6 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
   const { extracted_auid, extracted_university, is_valid_university, matches_auid } =
     await verifyIdCard(req.file.buffer, req.file.mimetype, auid);
 
-  // 1. Check if ID card is valid and AUID matches
   if (!is_valid_university || !matches_auid) {
     throw new ApiError(
       400,
@@ -30,9 +32,10 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
     );
   }
 
-  // 2. 🟢 Check if the extracted university matches the selected university
-  // We use includes() because extracted text might be "Akal University, Talwandi Sabo"
-  if (extracted_university && !extracted_university.includes(university)) {
+  const normalizedExtracted = extracted_university?.toLowerCase() || '';
+  const normalizedSelected = university.toLowerCase();
+
+  if (!normalizedExtracted.includes(normalizedSelected)) {
     throw new ApiError(
       400,
       `ID card university mismatch. You selected "${university}", but the ID card belongs to "${extracted_university}".`

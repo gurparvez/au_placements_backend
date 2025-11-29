@@ -29,7 +29,7 @@ STRICT RULES:
 TASK:
 1. Extract ALL readable text from the ID card image.
 2. Identify the printed AUID/UID number.
-3. Identify the university name printed on the card.
+3. Identify the university name printed on the card. Convert it to Title Case (e.g. "Akal University" instead of "AKAL UNIVERSITY").
 4. Allowed universities are exactly:
    - "Akal University"
    - "Eternal University"
