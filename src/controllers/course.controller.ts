@@ -36,6 +36,22 @@ export const getAllCourses = async (req: Request, res: Response) => {
     const courses = await Course.find({});
     res.json({ success: true, courses });
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch courses" });
+    res.status(500).json({ error: 'Failed to fetch courses' });
+  }
+};
+
+export const getCourseById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const course = await Course.findById(id);
+
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    res.json({ success: true, course });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch course' });
   }
 };
