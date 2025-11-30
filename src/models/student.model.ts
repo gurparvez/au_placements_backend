@@ -46,8 +46,6 @@ interface IEducation {
 interface IStudent extends Document {
   user: Types.ObjectId;
 
-  university: 'Akal University' | 'Eternal University';
-
   headline?: string;
   location: string;
   about?: string;
@@ -131,12 +129,6 @@ const StudentSchema = new Schema<IStudent>(
       required: true,
       unique: true,
       index: true,
-    },
-
-    university: {
-      type: String,
-      enum: ['Akal University', 'Eternal University'],
-      required: true,
     },
 
     headline: String,
