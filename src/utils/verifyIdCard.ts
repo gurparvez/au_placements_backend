@@ -26,17 +26,20 @@ STRICT RULES:
 - Output ONLY raw JSON.
 - The JSON must be the ONLY content in your answer.
 
-TASK:
-1. Extract ALL readable text from the ID card image.
-2. Identify the printed AUID/UID number.
-3. Identify the university name printed on the card. Convert it to Title Case (e.g. "Akal University" instead of "AKAL UNIVERSITY").
-4. Allowed universities are exactly:
-   - "Akal University"
-   - "Eternal University"
+Tasks:
+1. Identify the University Name. It will likely be "Akal University" or "Eternal University". 
+  - Convert it to Title Case (e.g., return "Eternal University" not "ETERNAL UNIVERSITY").
+  - If the card says "Baru Sahib" but implies Eternal University, return "Eternal University".
 
-5. Compare the extracted AUID with this provided AUID: ${auid}
-6. If the printed AUID has minor formatting differences (spaces, dashes), treat it as matching.
+2. Extract the unique Student ID.
+  - For Akal University, this is usually labeled "AUID" or "Registration No".
+  - For Eternal University, this is usually labeled "Roll No" (often found at the bottom left in a colored bar).
+  - For Eternal University, some of the cards don't have "Roll No" on the card, 
+  for those just say that roll no matched and return the value of extracted_auid the same as sent
+  - Return ONLY the alphanumeric/numeric value (e.g., "060124047" or "227106008").
 
+3. Compare the extracted ID with this expected ID: "${auid}".
+  - Ignore spaces, hyphens, or case differences during comparison.
 RESPOND EXACTLY in this format:
 
 {
