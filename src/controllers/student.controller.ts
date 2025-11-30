@@ -40,9 +40,6 @@ export const createStudentProfile = async (req: Request, res: Response) => {
       const resumeFile = files['resume'][0];
       console.log('Resume received:', resumeFile.originalname, resumeFile.size);
 
-      // Upload to a different folder, e.g., 'students/resumes'
-      // Note: Cloudinary handles PDFs automatically.
-      // If you are uploading .doc/.docx, Cloudinary accepts them as "raw" files usually.
       const uploaded: any = await uploadToCloudinary(resumeFile.buffer, 'students/resumes');
 
       // Save the URL into the resume_link field
@@ -75,7 +72,7 @@ export const createStudentProfile = async (req: Request, res: Response) => {
     });
 
     /* -------------------------------------------------------------------------- */
-    /* CREATE PROFILE                                                           */
+    /* CREATE PROFILE                                                             */
     /* -------------------------------------------------------------------------- */
 
     const profile = await Student.create({
@@ -151,9 +148,9 @@ export const updateStudentProfile = async (req: Request, res: Response) => {
     const updateData: any = { ...req.body };
 
     /* -------------------------------------------------------------------------- */
-    /* 1. HANDLE FILE UPLOADS (Image & Resume)                                  */
+    /* 1. HANDLE FILE UPLOADS (Image & Resume)                                    */
     /* -------------------------------------------------------------------------- */
-    
+
     // Cast req.files to handle multiple fields
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
 
@@ -162,10 +159,7 @@ export const updateStudentProfile = async (req: Request, res: Response) => {
       const imageFile = files['profile_image'][0];
       console.log('Profile Image received. Size:', imageFile.size);
 
-      const uploaded: any = await uploadToCloudinary(
-        imageFile.buffer, 
-        'students/profile_images'
-      );
+      const uploaded: any = await uploadToCloudinary(imageFile.buffer, 'students/profile_images');
 
       console.log('Image Cloudinary upload complete:', uploaded?.public_id);
       updateData.profile_image = uploaded.secure_url;
@@ -176,10 +170,7 @@ export const updateStudentProfile = async (req: Request, res: Response) => {
       const resumeFile = files['resume'][0];
       console.log('Resume received. Size:', resumeFile.size);
 
-      const uploaded: any = await uploadToCloudinary(
-        resumeFile.buffer, 
-        'students/resumes'
-      );
+      const uploaded: any = await uploadToCloudinary(resumeFile.buffer, 'students/resumes');
 
       console.log('Resume Cloudinary upload complete:', uploaded?.public_id);
       updateData.resume_link = uploaded.secure_url;
@@ -188,7 +179,7 @@ export const updateStudentProfile = async (req: Request, res: Response) => {
     /* -------------------------------------------------------------------------- */
     /* 2. PARSE JSON STRINGS (Fix for FormData "CastError")                     */
     /* -------------------------------------------------------------------------- */
-    
+
     const fieldsToParse = [
       'education',
       'experience',
@@ -205,8 +196,6 @@ export const updateStudentProfile = async (req: Request, res: Response) => {
           updateData[field] = JSON.parse(updateData[field]);
         } catch (error) {
           console.error(`Error parsing field ${field}:`, error);
-          // We catch here so we don't crash everything,
-          // but Mongoose might still throw validation error if data is bad.
         }
       }
     });

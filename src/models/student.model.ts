@@ -2,11 +2,17 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 /* ---------------------- Interfaces ---------------------- */
 
+interface ILookingFor {
+  type: 'internship' | 'job';
+  from_date?: Date;
+  to_date?: Date;
+}
+
 interface ICertificate {
   name: string;
   issued_by: string;
   issue_date: Date;
-  certificate_url?: string; // 🔵 optional now
+  certificate_url?: string;
   valid_until?: Date;
 }
 
@@ -40,6 +46,8 @@ interface IEducation {
 interface IStudent extends Document {
   user: Types.ObjectId;
 
+  university: 'Akal University' | 'Eternal University';
+
   headline?: string;
   location: string;
   about?: string;
@@ -50,7 +58,8 @@ interface IStudent extends Document {
   resume_link?: string;
 
   preferred_field?: string;
-  looking_for?: ('internship' | 'job')[];
+
+  looking_for: ILookingFor;
 
   experience?: IExperience[];
   total_experience: number;
@@ -64,11 +73,24 @@ interface IStudent extends Document {
 
 /* ---------------------- Sub Schemas ---------------------- */
 
+const LookingForSchema = new Schema<ILookingFor>(
+  {
+    type: {
+      type: String,
+      enum: ['internship', 'job'],
+      required: true,
+    },
+    from_date: { type: Date },
+    to_date: { type: Date },
+  },
+  { _id: false }
+);
+
 const CertificateSchema = new Schema<ICertificate>({
   name: { type: String, required: true },
   issued_by: { type: String, required: true },
   issue_date: { type: Date, required: true },
-  certificate_url: { type: String }, // 🔵 no longer required
+  certificate_url: { type: String },
   valid_until: { type: Date },
 });
 
@@ -111,6 +133,12 @@ const StudentSchema = new Schema<IStudent>(
       index: true,
     },
 
+    university: {
+      type: String,
+      enum: ['Akal University', 'Eternal University'],
+      required: true,
+    },
+
     headline: String,
     location: { type: String, required: true },
     about: String,
@@ -122,16 +150,15 @@ const StudentSchema = new Schema<IStudent>(
     resume_link: String,
 
     looking_for: {
-      type: [String],
-      enum: ['internship', 'job'],
-      default: [], // 🔵 empty allowed
+      type: LookingForSchema,
+      default: {},
     },
 
-    experience: { type: [ExperienceSchema], default: [] }, // 🔵 optional
+    experience: { type: [ExperienceSchema], default: [] },
     total_experience: { type: Number, default: 0 },
 
-    projects: { type: [ProjectSchema], default: [] }, // 🔵 optional
-    certificates: { type: [CertificateSchema], default: [] }, // 🔵 optional
+    projects: { type: [ProjectSchema], default: [] },
+    certificates: { type: [CertificateSchema], default: [] },
 
     skills: [{ type: Schema.Types.ObjectId, ref: 'Skill', default: [] }],
     education: { type: [EducationSchema], default: [] },
@@ -165,7 +192,7 @@ StudentSchema.pre('save', function (next) {
   next();
 });
 
-// Pre-update hook (important for PUT/PATCH operations)
+// Pre-update hook
 StudentSchema.pre('findOneAndUpdate', function (next) {
   const update = this.getUpdate() as any;
 
