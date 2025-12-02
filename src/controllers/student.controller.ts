@@ -237,7 +237,7 @@ export const getAllStudents = async (req: Request, res: Response) => {
     const students = await Student.find({})
       .populate('skills')
       .populate('education.course')
-      .populate('user', 'firstName lastName auid');
+      .populate('user', '-password');
 
     res.json({ success: true, students });
   } catch (err) {
