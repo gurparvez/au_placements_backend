@@ -8,7 +8,6 @@ export const uploadToCloudinary = async (fileBuffer: Buffer, folder: string) => 
       { folder: folder },
       (error, result) => {
         if (error) {
-          console.log('Cloudinary Stream Upload Error:', error);
           return reject(error);
         }
         resolve(result);

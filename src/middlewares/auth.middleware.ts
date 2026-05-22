@@ -3,6 +3,7 @@ import jwt, { JwtPayload } from 'jsonwebtoken';
 import { User } from '../models/user.model';
 import { ApiError } from '../utils/ApiError';
 import { asyncHandler } from '../utils/handler';
+import { CONFIG } from '../config/environment';
 
 interface IJwtPayload extends JwtPayload {
   _id: string;
@@ -17,14 +18,9 @@ const verifyJwt = asyncHandler(async function (req: Request, res: Response, next
     throw new ApiError(401, 'Token is required.');
   }
 
-  const secret = process.env.ACCESS_TOKEN_SECRET;
-  if (!secret) {
-    throw new ApiError(500, 'Failed to load secret key from env.');
-  }
-
   let decoded: IJwtPayload;
   try {
-    decoded = jwt.verify(token, secret) as IJwtPayload;
+    decoded = jwt.verify(token, CONFIG.accessTokenSecret) as IJwtPayload;
   } catch (err) {
     throw new ApiError(401, 'Invalid or expired token.');
   }

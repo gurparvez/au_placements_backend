@@ -1,63 +1,32 @@
 import { Request, Response } from 'express';
-import { Skill } from '../models/skill.model';
+import { SkillService } from '../services/skill.service';
+import { getPagination } from '../utils/paginate';
+import { asyncHandler } from '../utils/handler';
 
-export const addSkill = async (req: Request, res: Response) => {
-  try {
-    const { name } = req.body;
-    const normalized = name.trim().toLowerCase();
+const skillService = new SkillService();
 
-    const skill = await Skill.findOneAndUpdate(
-      { name: normalized },
-      { name: normalized, displayName: name.trim() },
-      { upsert: true, new: true }
-    );
+export const addSkill = asyncHandler(async (req: Request, res: Response) => {
+  const { name } = req.body;
+  const skill = await skillService.addSkill(name);
+  res.status(201).json({ success: true, data: skill });
+});
 
-    res.status(201).json(skill);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to add skill' });
-  }
-};
+export const searchSkills = asyncHandler(async (req: Request, res: Response) => {
+  const q = req.query.q as string;
+  const skills = await skillService.search(q);
+  res.json({ success: true, data: skills });
+});
 
-export const searchSkills = async (req: Request, res: Response) => {
-  try {
-    const q = req.query.q as string;
+export const getAllSkills = asyncHandler(async (req: Request, res: Response) => {
+  const { page, limit, skip } = getPagination(req);
+  const result = await skillService.getAll(page, limit, skip);
+  res.json({ success: true, data: result.skills, pagination: result.pagination });
+});
 
-    const skills = await Skill.find({
-      name: { $regex: q, $options: 'i' },
-    }).limit(10);
+export const getSkillById = asyncHandler(async (req: Request, res: Response) => {
+  const { skillId } = req.params;
+  if (!skillId) return res.status(400).json({ success: false, message: 'skillId is required' });
 
-    res.json(skills);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch skills' });
-  }
-};
-
-export const getAllSkills = async (req: Request, res: Response) => {
-  try {
-    const skills = await Skill.find({});
-    res.json({ success: true, skills });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch skills" });
-  }
-};
-
-export const getSkillById = async (req: Request, res: Response) => {
-  try {
-    const { skillId } = req.params;
-
-    if (!skillId) {
-      return res.status(400).json({ error: "skillId is required" });
-    }
-
-    const skill = await Skill.findById(skillId);
-
-    if (!skill) {
-      return res.status(404).json({ error: "Skill not found" });
-    }
-
-    res.json({ success: true, skill });
-  } catch (err) {
-    console.log("getSkillById ERROR:", err);
-    res.status(500).json({ error: "Failed to fetch skill" });
-  }
-};
+  const skill = await skillService.getById(skillId);
+  res.json({ success: true, data: skill });
+});

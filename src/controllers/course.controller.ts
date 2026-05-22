@@ -1,57 +1,30 @@
 import { Request, Response } from 'express';
-import { Course } from '../models/course.model';
+import { CourseService } from '../services/course.service';
+import { getPagination } from '../utils/paginate';
+import { asyncHandler } from '../utils/handler';
 
-export const addCourse = async (req: Request, res: Response) => {
-  try {
-    const { name, category } = req.body;
+const courseService = new CourseService();
 
-    const course = await Course.findOneAndUpdate(
-      { name },
-      { name, category },
-      { upsert: true, new: true }
-    );
+export const addCourse = asyncHandler(async (req: Request, res: Response) => {
+  const { name, category } = req.body;
+  const course = await courseService.addCourse(name, category);
+  res.status(201).json({ success: true, data: course });
+});
 
-    res.status(201).json(course);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to add course' });
-  }
-};
+export const searchCourses = asyncHandler(async (req: Request, res: Response) => {
+  const q = req.query.q as string;
+  const courses = await courseService.search(q);
+  res.json({ success: true, data: courses });
+});
 
-export const searchCourses = async (req: Request, res: Response) => {
-  try {
-    const q = req.query.q as string;
+export const getAllCourses = asyncHandler(async (req: Request, res: Response) => {
+  const { page, limit, skip } = getPagination(req);
+  const result = await courseService.getAll(page, limit, skip);
+  res.json({ success: true, data: result.courses, pagination: result.pagination });
+});
 
-    const courses = await Course.find({
-      name: { $regex: q, $options: 'i' },
-    }).limit(10);
-
-    res.json(courses);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch courses' });
-  }
-};
-
-export const getAllCourses = async (req: Request, res: Response) => {
-  try {
-    const courses = await Course.find({});
-    res.json({ success: true, courses });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch courses' });
-  }
-};
-
-export const getCourseById = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-
-    const course = await Course.findById(id);
-
-    if (!course) {
-      return res.status(404).json({ error: 'Course not found' });
-    }
-
-    res.json({ success: true, course });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch course' });
-  }
-};
+export const getCourseById = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const course = await courseService.getById(id);
+  res.json({ success: true, data: course });
+});

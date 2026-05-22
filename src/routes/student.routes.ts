@@ -8,6 +8,8 @@ import {
 } from '../controllers/student.controller';
 import { verifyJwt } from '../middlewares/auth.middleware';
 import { upload } from '../middlewares/upload.middleware';
+import { validate } from '../validators/auth.validator';
+import { updateProfileSchema } from '../validators/student.validator';
 
 const router = Router();
 
@@ -28,9 +30,10 @@ router.put(
     { name: 'profile_image', maxCount: 1 },
     { name: 'resume', maxCount: 1 },
   ]),
+  validate(updateProfileSchema),
   updateStudentProfile
 );
-router.get('/all', getAllStudents); // public route
-router.get('/profile', getAnyStudentProfile); // public route
+router.get('/all', getAllStudents);             // Public: recruiters can browse
+router.get('/profile', getAnyStudentProfile);   // Public: recruiters can view profiles
 
 export default router;

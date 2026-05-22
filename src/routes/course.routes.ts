@@ -5,10 +5,11 @@ import {
   getCourseById,
   searchCourses,
 } from '../controllers/course.controller';
+import { verifyJwt } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-router.post('/', addCourse);
+router.post('/', verifyJwt, addCourse);
 router.get('/search', searchCourses);
 router.get('/', getAllCourses);
 router.get('/:id', getCourseById);
