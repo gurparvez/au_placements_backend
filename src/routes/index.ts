@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { homeController } from '../controllers/home.controller';
 import authRoutes from './auth.routes';
 import courseRoutes from './course.routes';
+import jobRoutes from './job.routes';
 import skillRoutes from './skill.routes';
 import studentRoutes from './student.routes';
 
@@ -15,5 +16,6 @@ router.use('/auth', authRoutes);
 router.use('/student', studentRoutes);
 router.use('/skills', skillRoutes);
 router.use('/courses', courseRoutes);
+router.use('/jobs', jobRoutes);
 
 export default router;

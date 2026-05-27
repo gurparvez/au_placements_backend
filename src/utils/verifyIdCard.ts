@@ -1,103 +1,169 @@
-import { GoogleGenAI } from '@google/genai';
+import { spawn } from 'child_process';
+import { CONFIG } from '../config/environment';
 
 export interface ICardVerificationResult {
   extracted_auid: string;
   extracted_university: string;
   is_valid_university: boolean;
   matches_auid: boolean;
+  ocr_error?: string;
 }
 
-const client = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY!,
-});
+interface PythonOcrResult {
+  success: boolean;
+  text?: string;
+  error?: string;
+}
+
+const VALID_UNIVERSITIES = ['Akal University', 'Eternal University'] as const;
+
+function normalizeId(value: string) {
+  return value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+}
+
+function normalizeText(value: string) {
+  return value.toLowerCase().replace(/\s+/g, ' ');
+}
+
+function passthroughResult(auid: string, expectedUniversity?: string): ICardVerificationResult {
+  return {
+    extracted_auid: auid,
+    extracted_university: expectedUniversity || '',
+    is_valid_university: true,
+    matches_auid: true,
+  };
+}
+
+function detectUniversity(text: string, expectedUniversity?: string) {
+  const normalized = normalizeText(text);
+
+  if (normalized.includes('akal university')) return 'Akal University';
+  if (normalized.includes('eternal university') || normalized.includes('baru sahib')) {
+    return 'Eternal University';
+  }
+
+  if (expectedUniversity && normalized.includes(normalizeText(expectedUniversity))) {
+    return expectedUniversity;
+  }
+
+  return '';
+}
+
+function extractStudentId(text: string, expectedAuid: string) {
+  const expected = normalizeId(expectedAuid);
+  const compactText = normalizeId(text);
+
+  if (expected && compactText.includes(expected)) return expectedAuid;
+
+  const labeledPatterns = [
+    /(?:AUID|AU\s*ID|Registration\s*(?:No|Number)?|Reg\.?\s*No|Roll\s*(?:No|Number)?|Student\s*ID|ID\s*No)\s*[:#-]?\s*([A-Z0-9][A-Z0-9 -]{4,20})/gi,
+  ];
+
+  for (const pattern of labeledPatterns) {
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      const candidate = normalizeId(match[1] || '');
+      if (candidate.length >= 5 && candidate.length <= 15 && /\d/.test(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  const candidates = text.match(/[A-Z0-9]{5,15}/gi) || [];
+  const candidate = candidates.map(normalizeId).find((value) => /\d/.test(value));
+
+  return candidate || '';
+}
+
+function runPythonOcr(imageBuffer: Buffer, mimeType: string): Promise<PythonOcrResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(CONFIG.ocr.pythonBin, [CONFIG.ocr.scriptPath], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.on('error', (error) => {
+      reject(error);
+    });
+
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(stderr || `Python OCR exited with code ${code}`));
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(stdout || '{}'));
+      } catch {
+        reject(new Error(`Python OCR returned invalid JSON: ${stdout}`));
+      }
+    });
+
+    child.stdin.write(
+      JSON.stringify({
+        image_base64: imageBuffer.toString('base64'),
+        mime_type: mimeType,
+      })
+    );
+    child.stdin.end();
+  });
+}
 
 export async function verifyIdCard(
   imageBuffer: Buffer,
   mimeType: string,
-  auid: string
+  auid: string,
+  expectedUniversity?: string
 ): Promise<ICardVerificationResult> {
-  const prompt = `
-You are an automated ID card OCR + verification system.
+  const verificationMode = CONFIG.ocr.verificationMode.toLowerCase();
 
-STRICT RULES:
-- NEVER wrap the response in backticks or code fences.
-- NEVER output markdown.
-- NEVER add explanations.
-- Output ONLY raw JSON.
-- The JSON must be the ONLY content in your answer.
-
-Tasks:
-1. Identify the University Name. It will likely be "Akal University" or "Eternal University". 
-  - Convert it to Title Case (e.g., return "Eternal University" not "ETERNAL UNIVERSITY").
-  - If the card says "Baru Sahib" but implies Eternal University, return "Eternal University".
-
-2. Extract the unique Student ID.
-  - For Akal University, this is usually labeled "AUID" or "Registration No".
-  - For Eternal University, this is usually labeled "Roll No" (often found at the bottom left in a colored bar).
-  - For Eternal University, some of the cards don't have "Roll No" on the card, 
-  for those just say that roll no matched and return the value of extracted_auid the same as sent
-  - Return ONLY the alphanumeric/numeric value (e.g., "060124047" or "227106008").
-
-3. Compare the extracted ID with this expected ID: "${auid}".
-  - Ignore spaces, hyphens, or case differences during comparison.
-RESPOND EXACTLY in this format:
-
-{
-  "extracted_auid": "....",
-  "extracted_university": "....",
-  "is_valid_university": true/false,
-  "matches_auid": true/false
-}
-
-REMEMBER:
-- NO backticks.
-- NO extra text.
-- NO markdown.
-- ONLY raw JSON.
-`;
-
-  const response = await client.models.generateContent({
-    model: 'gemini-2.0-flash',
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: imageBuffer.toString('base64'),
-            },
-          },
-          { text: prompt },
-        ],
-      },
-    ],
-  });
-
-  const text = response?.text ?? '{}';
-  console.log(text);
+  if (verificationMode === 'disabled') {
+    return passthroughResult(auid, expectedUniversity);
+  }
 
   try {
-    const clean = text
-      .replace(/```json/gi, '')
-      .replace(/```/g, '')
-      .trim();
+    const ocr = await runPythonOcr(imageBuffer, mimeType);
 
-    const parsed = JSON.parse(clean);
+    if (!ocr.success || !ocr.text) {
+      if (verificationMode === 'review') return passthroughResult(auid, expectedUniversity);
+
+      return {
+        extracted_auid: '',
+        extracted_university: '',
+        is_valid_university: false,
+        matches_auid: false,
+        ocr_error: ocr.error || 'Python OCR did not return text.',
+      };
+    }
+
+    const extractedUniversity = detectUniversity(ocr.text, expectedUniversity);
+    const extractedAuid = extractStudentId(ocr.text, auid);
 
     return {
-      extracted_auid: parsed.extracted_auid || '',
-      extracted_university: parsed.extracted_university || '',
-      is_valid_university: parsed.is_valid_university ?? false,
-      matches_auid: parsed.matches_auid ?? false,
+      extracted_auid: extractedAuid,
+      extracted_university: extractedUniversity,
+      is_valid_university: VALID_UNIVERSITIES.includes(extractedUniversity as any),
+      matches_auid: normalizeId(extractedAuid) === normalizeId(auid),
     };
-  } catch (e) {
-    console.log('error', e);
+  } catch (error: any) {
+    if (verificationMode === 'review') return passthroughResult(auid, expectedUniversity);
+
     return {
       extracted_auid: '',
       extracted_university: '',
       is_valid_university: false,
       matches_auid: false,
+      ocr_error: error?.message || 'Python OCR failed.',
     };
   }
 }

@@ -7,14 +7,25 @@ import { CONFIG } from '../config/environment';
 const authService = new AuthService();
 
 export const registerUser = asyncHandler(async (req: Request, res: Response) => {
-  const { auid, password, firstName, lastName, email, phone, university } = req.body;
+  const {
+    auid,
+    password,
+    firstName,
+    lastName,
+    email,
+    phone,
+    university,
+    programme,
+    branch_department,
+    batch_year,
+  } = req.body;
 
   if (!req.file) {
     throw new ApiError(400, 'ID card image is required.');
   }
 
   const user = await authService.register({
-    auid, password, firstName, lastName, email, phone, university,
+    auid, password, firstName, lastName, email, phone, university, programme, branch_department, batch_year,
     idCardBuffer: req.file.buffer,
     idCardMimetype: req.file.mimetype,
   });
@@ -23,6 +34,49 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
     success: true,
     message: 'User registered successfully.',
     data: user,
+  });
+});
+
+export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
+  const { token } = req.body;
+  const user = await authService.verifyEmail(token);
+
+  res.json({
+    success: true,
+    message: 'Email verified successfully.',
+    data: user,
+  });
+});
+
+export const resendVerification = asyncHandler(async (req: Request, res: Response) => {
+  const result = await authService.resendVerification(req.body);
+
+  res.json({
+    success: true,
+    message: result.alreadyVerified
+      ? 'Email is already verified.'
+      : 'If the account exists, a verification link has been prepared.',
+    data: result,
+  });
+});
+
+export const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
+  const result = await authService.requestPasswordReset(req.body);
+
+  res.json({
+    success: true,
+    message: 'If the account exists, a password reset link has been prepared.',
+    data: result,
+  });
+});
+
+export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
+  const { token, newPassword } = req.body;
+  await authService.resetPassword(token, newPassword);
+
+  res.json({
+    success: true,
+    message: 'Password reset successfully.',
   });
 });
 

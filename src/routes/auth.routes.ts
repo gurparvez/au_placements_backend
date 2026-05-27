@@ -3,15 +3,27 @@ import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 import { CONFIG } from '../config/environment';
 import {
+  forgotPassword,
   getUser,
   loginUser,
   logoutUser,
   registerUser,
+  resendVerification,
+  resetPassword,
   updatePassword,
   updateUserInfo,
+  verifyEmail,
 } from '../controllers/auth.controller';
 import { verifyJwt } from '../middlewares/auth.middleware';
-import { validate, registerSchema, loginSchema } from '../validators/auth.validator';
+import {
+  forgotPasswordSchema,
+  loginSchema,
+  registerSchema,
+  resendVerificationSchema,
+  resetPasswordSchema,
+  validate,
+  verifyEmailSchema,
+} from '../validators/auth.validator';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -38,6 +50,15 @@ const router = Router();
 
 router.post('/register', authLimiter, upload.single('id_card'), validate(registerSchema), registerUser);
 router.post('/login', authLimiter, validate(loginSchema), loginUser);
+router.post('/verify-email', authLimiter, validate(verifyEmailSchema), verifyEmail);
+router.post(
+  '/resend-verification',
+  authLimiter,
+  validate(resendVerificationSchema),
+  resendVerification
+);
+router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), forgotPassword);
+router.post('/reset-password', authLimiter, validate(resetPasswordSchema), resetPassword);
 router.get('/user', verifyJwt, getUser);
 router.post('/logout', verifyJwt, logoutUser);
 router.put('/update', verifyJwt, updateUserInfo);

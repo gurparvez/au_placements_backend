@@ -3,7 +3,9 @@ import {
   createStudentProfile,
   getAllStudents,
   getAnyStudentProfile,
+  getStudentProfileHistory,
   getStudentProfile,
+  reviewStudentProfile,
   updateStudentProfile,
 } from '../controllers/student.controller';
 import { verifyJwt } from '../middlewares/auth.middleware';
@@ -19,16 +21,20 @@ router.post(
   upload.fields([
     { name: 'profile_image', maxCount: 1 },
     { name: 'resume', maxCount: 1 },
+    { name: 'supporting_documents', maxCount: 10 },
   ]),
   createStudentProfile
 );
 router.get('/', verifyJwt, getStudentProfile);
+router.get('/history', verifyJwt, getStudentProfileHistory);
+router.post('/review', verifyJwt, reviewStudentProfile);
 router.put(
   '/',
   verifyJwt,
   upload.fields([
     { name: 'profile_image', maxCount: 1 },
     { name: 'resume', maxCount: 1 },
+    { name: 'supporting_documents', maxCount: 10 },
   ]),
   validate(updateProfileSchema),
   updateStudentProfile

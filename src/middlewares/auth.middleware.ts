@@ -7,7 +7,7 @@ import { CONFIG } from '../config/environment';
 
 interface IJwtPayload extends JwtPayload {
   _id: string;
-  roles: ('student' | 'admin')[];
+  roles: ('student' | 'admin' | 'internal_poster' | 'recruiter' | 'tpo')[];
 }
 
 const verifyJwt = asyncHandler(async function (req: Request, res: Response, next: NextFunction) {
@@ -37,4 +37,24 @@ const verifyJwt = asyncHandler(async function (req: Request, res: Response, next
   next();
 });
 
-export { verifyJwt };
+const optionalJwt = asyncHandler(async function (req: Request, res: Response, next: NextFunction) {
+  const token = req.cookies?.token || req.header('Authorization')?.replace('Bearer ', '');
+
+  if (!token || token.trim() === '') {
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(token, CONFIG.accessTokenSecret) as IJwtPayload;
+    const user = await User.findById(decoded._id);
+    if (user) {
+      res.locals.user = user;
+    }
+  } catch {
+    // Public endpoints should keep working when an optional token is stale.
+  }
+
+  next();
+});
+
+export { verifyJwt, optionalJwt };

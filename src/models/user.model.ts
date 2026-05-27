@@ -12,8 +12,16 @@ interface IUser extends Document {
   phone: string;
 
   university: 'Akal University' | 'Eternal University';
+  programme: string;
+  branch_department: string;
+  batch_year: number;
+  email_verified: boolean;
+  email_verification_token_hash?: string;
+  email_verification_expires_at?: Date;
+  password_reset_token_hash?: string;
+  password_reset_expires_at?: Date;
 
-  roles: ('student' | 'admin')[];
+  roles: ('student' | 'admin' | 'internal_poster' | 'recruiter' | 'tpo')[];
 
   isPasswordCorrect(password: String): Promise<boolean>;
   accessToken(): String;
@@ -57,15 +65,51 @@ const userSchema: Schema = new Schema(
       enum: ['Akal University', 'Eternal University'],
       required: true,
     },
+    programme: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    branch_department: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    batch_year: {
+      type: Number,
+      required: true,
+      min: 2000,
+      max: 2100,
+    },
 
     roles: {
       type: [String],
-      enum: ['student', 'admin'],
+      enum: ['student', 'admin', 'internal_poster', 'recruiter', 'tpo'],
       default: ['student'],
     },
     verified: {
       type: Boolean,
       default: false,
+    },
+    email_verified: {
+      type: Boolean,
+      default: false,
+    },
+    email_verification_token_hash: {
+      type: String,
+      select: false,
+    },
+    email_verification_expires_at: {
+      type: Date,
+      select: false,
+    },
+    password_reset_token_hash: {
+      type: String,
+      select: false,
+    },
+    password_reset_expires_at: {
+      type: Date,
+      select: false,
     },
   },
   {

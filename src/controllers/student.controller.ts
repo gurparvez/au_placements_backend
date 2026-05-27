@@ -37,6 +37,20 @@ export const updateStudentProfile = asyncHandler(async (req: Request, res: Respo
   res.json({ success: true, message: 'Profile updated', data: updated });
 });
 
+export const reviewStudentProfile = asyncHandler(async (req: Request, res: Response) => {
+  const user = res.locals.user;
+
+  const updated = await studentService.markProfileReviewed(user._id);
+  res.json({ success: true, message: 'Profile review confirmed', data: updated });
+});
+
+export const getStudentProfileHistory = asyncHandler(async (req: Request, res: Response) => {
+  const user = res.locals.user;
+
+  const history = await studentService.getProfileHistory(user._id);
+  res.json({ success: true, data: history });
+});
+
 export const getAllStudents = asyncHandler(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req);
   const result = await studentService.getAllStudents(page, limit, skip);
