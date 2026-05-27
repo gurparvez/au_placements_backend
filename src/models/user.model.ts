@@ -3,25 +3,30 @@ import jwt, { Secret, SignOptions } from 'jsonwebtoken';
 import mongoose, { Document, Schema } from 'mongoose';
 import { ApiError } from '../utils/ApiError';
 
+type UserRole = 'student' | 'admin' | 'internal_poster' | 'recruiter' | 'tpo';
+type AccountType = 'student' | 'admin' | 'internal' | 'recruiter';
+
 interface IUser extends Document {
-  auid: string;
+  auid?: string;
   password: string;
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
 
-  university: 'Akal University' | 'Eternal University';
-  programme: string;
-  branch_department: string;
-  batch_year: number;
+  account_type: AccountType;
+  university?: 'Akal University' | 'Eternal University';
+  programme?: string;
+  branch_department?: string;
+  batch_year?: number;
+  company_name?: string;
   email_verified: boolean;
   email_verification_token_hash?: string;
   email_verification_expires_at?: Date;
   password_reset_token_hash?: string;
   password_reset_expires_at?: Date;
 
-  roles: ('student' | 'admin' | 'internal_poster' | 'recruiter' | 'tpo')[];
+  roles: UserRole[];
 
   isPasswordCorrect(password: String): Promise<boolean>;
   accessToken(): String;
@@ -32,8 +37,10 @@ const userSchema: Schema = new Schema(
     auid: {
       type: String,
       unique: true,
-      required: true,
+      sparse: true,
+      required: false,
       index: true,
+      trim: true,
     },
     password: {
       type: String,
@@ -43,43 +50,62 @@ const userSchema: Schema = new Schema(
       type: String,
       required: true,
       lowercase: true,
+      trim: true,
     },
     lastName: {
       type: String,
       required: false,
       lowercase: true,
+      trim: true,
     },
     email: {
       type: String,
       required: false,
       unique: true,
+      sparse: true,
+      lowercase: true,
+      trim: true,
     },
     phone: {
       type: String,
       required: false,
       unique: true,
+      sparse: true,
+      trim: true,
+    },
+
+    account_type: {
+      type: String,
+      enum: ['student', 'admin', 'internal', 'recruiter'],
+      default: 'student',
+      index: true,
     },
 
     university: {
       type: String,
       enum: ['Akal University', 'Eternal University'],
-      required: true,
+      required: false,
     },
     programme: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
     branch_department: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
     batch_year: {
       type: Number,
-      required: true,
+      required: false,
       min: 2000,
       max: 2100,
+    },
+    company_name: {
+      type: String,
+      required: false,
+      trim: true,
     },
 
     roles: {
@@ -142,7 +168,8 @@ userSchema.methods.accessToken = function (): string {
     {
       _id: this._id,
       roles: this.roles,
-      university: this.university, // Optional: useful to have university in the token payload
+      university: this.university,
+      account_type: this.account_type,
     },
     secret,
     options

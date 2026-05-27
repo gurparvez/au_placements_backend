@@ -22,6 +22,15 @@ interface IEligibilityResult {
   computed_at: Date;
 }
 
+interface IEligibilityOverride {
+  student: Types.ObjectId;
+  user: Types.ObjectId;
+  eligible: boolean;
+  reason: string;
+  overridden_by: Types.ObjectId;
+  overridden_at: Date;
+}
+
 interface IJobListing extends Document {
   posted_by: Types.ObjectId;
   poster_type: 'Internal' | 'ThirdParty' | 'Admin';
@@ -35,6 +44,7 @@ interface IJobListing extends Document {
   location?: string;
   eligibility: IEligibilityCriteria;
   eligibility_results: IEligibilityResult[];
+  eligibility_overrides: IEligibilityOverride[];
   deadline: Date;
   status: JobStatus;
   contact_person?: string;
@@ -68,6 +78,18 @@ const EligibilityResultSchema = new Schema<IEligibilityResult>(
   { _id: false }
 );
 
+const EligibilityOverrideSchema = new Schema<IEligibilityOverride>(
+  {
+    student: { type: Schema.Types.ObjectId, ref: 'Student', required: true },
+    user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    eligible: { type: Boolean, required: true },
+    reason: { type: String, required: true },
+    overridden_by: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    overridden_at: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const JobListingSchema = new Schema<IJobListing>(
   {
     posted_by: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
@@ -97,6 +119,7 @@ const JobListingSchema = new Schema<IJobListing>(
     location: { type: String },
     eligibility: { type: EligibilityCriteriaSchema, default: {} },
     eligibility_results: { type: [EligibilityResultSchema], default: [] },
+    eligibility_overrides: { type: [EligibilityOverrideSchema], default: [] },
     deadline: { type: Date, required: true, index: true },
     status: {
       type: String,
@@ -114,4 +137,11 @@ JobListingSchema.index({ status: 1, deadline: 1, target_university: 1 });
 const JobListing = mongoose.model<IJobListing>('JobListing', JobListingSchema);
 
 export { JobListing };
-export type { IEligibilityCriteria, IEligibilityResult, IJobListing, JobStatus, JobType };
+export type {
+  IEligibilityCriteria,
+  IEligibilityOverride,
+  IEligibilityResult,
+  IJobListing,
+  JobStatus,
+  JobType,
+};

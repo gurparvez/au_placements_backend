@@ -26,3 +26,24 @@ export const createJobSchema = z.object({
   status: z.enum(['Draft', 'Active', 'Closed']).optional(),
   contact_person: z.string().max(100).optional(),
 });
+
+export const updateJobSchema = createJobSchema.partial();
+
+export const updateApplicationStatusSchema = z.object({
+  status: z.enum([
+    'Applied',
+    'Shortlisted',
+    'InterviewScheduled',
+    'Selected',
+    'Rejected',
+    'Offer Accepted',
+    'Offer Declined',
+  ]),
+  note: z.string().max(500).optional(),
+});
+
+export const eligibilityOverrideSchema = z.object({
+  userId: z.string().min(1, 'Student user id is required'),
+  eligible: z.boolean(),
+  reason: z.string().min(1, 'Override reason is required').max(500),
+});

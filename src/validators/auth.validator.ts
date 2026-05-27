@@ -40,7 +40,7 @@ export const registerSchema = z
   });
 
 export const loginSchema = z.object({
-  auid: z.string().min(1, 'AUID is required'),
+  auid: z.string().min(1, 'AUID or email is required'),
   password: z.string().min(1, 'Password is required'),
 });
 

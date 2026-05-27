@@ -23,11 +23,21 @@ Date: 26 May 2026
   - `GET /api/jobs/applications/me`
 - Poster/admin routes:
   - `POST /api/jobs`
+  - `PATCH /api/jobs/:jobId`
+  - `GET /api/jobs/:jobId/applications`
+  - `PATCH /api/jobs/:jobId/applications/:applicationId`
   - `POST /api/jobs/:jobId/recompute-eligibility`
+  - `POST /api/jobs/:jobId/eligibility-overrides`
+- Job managers can update application statuses across the placement workflow.
+- Admin/TPO users can manually override eligibility with a mandatory reason.
+- Student profile creation/update recomputes that student's eligibility across active listings.
 
 ## Frontend Support
 
 - `/jobs` page for opportunity discovery.
+- `/jobs/new` page for authorized users to post opportunities.
+- `/applications` page for students to track submitted applications.
+- `/jobs/:jobId/applications` page for authorized job managers to review applicants and update status.
 - Search and filters for type and university.
 - Eligibility/Not Eligible badge for logged-in students.
 - Ineligibility reason display.
@@ -43,14 +53,13 @@ Date: 26 May 2026
   - `tpo`
   - `internal_poster`
   - `recruiter`
+- Job/applicant management is available to the job poster, `admin`, or `tpo`.
+- Eligibility override is limited to `admin` and `tpo`.
 
 ## Still Needed
 
-- Full job posting UI for admins, TPOs, internal posters, and recruiters.
 - Recruiter account request/approval workflow.
 - Admin-configurable third-party job approval gate.
-- Interview scheduling and status update screens.
-- Eligibility recomputation trigger when a student updates profile data.
-- Manual admin/TPO eligibility override with reason.
+- Detailed interview scheduling screens with venues, panels, and time slots.
+- Dedicated UI for eligibility overrides.
 - Notifications for eligible jobs and submitted applications.
-

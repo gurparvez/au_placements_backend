@@ -108,6 +108,7 @@ export class AuthService {
       programme,
       branch_department,
       batch_year,
+      account_type: 'student',
       roles: ['student'],
       verified: true,
       email_verified: false,
@@ -119,6 +120,7 @@ export class AuthService {
       _id: user._id,
       auid: user.auid,
       firstName: user.firstName,
+      account_type: user.account_type,
       university: user.university,
       programme: user.programme,
       branch_department: user.branch_department,
@@ -135,15 +137,18 @@ export class AuthService {
     };
   }
 
-  async login(auid: string, password: string) {
-    const user = await User.findOne({ auid });
-    if (!user) throw new ApiError(401, 'Invalid AUID or password.');
+  async login(identifier: string, password: string) {
+    const normalizedIdentifier = identifier.trim().toLowerCase();
+    const user = await User.findOne({
+      $or: [{ auid: identifier.trim() }, { email: normalizedIdentifier }],
+    });
+    if (!user) throw new ApiError(401, 'Invalid login or password.');
 
     const isValid = await user.isPasswordCorrect(password);
-    if (!isValid) throw new ApiError(401, 'Invalid AUID or password.');
+    if (!isValid) throw new ApiError(401, 'Invalid login or password.');
 
     if (!user.email_verified) {
-      throw new ApiError(403, 'Please verify your university email before logging in.');
+      throw new ApiError(403, 'Please verify your email before logging in.');
     }
 
     const token = user.accessToken();
@@ -156,10 +161,12 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
+        account_type: user.account_type,
         university: user.university,
         programme: user.programme,
         branch_department: user.branch_department,
         batch_year: user.batch_year,
+        company_name: user.company_name,
         email_verified: user.email_verified,
         roles: user.roles,
       },
@@ -177,10 +184,12 @@ export class AuthService {
       lastName: user.lastName,
       email: user.email,
       phone: user.phone,
+      account_type: user.account_type,
       university: user.university,
       programme: user.programme,
       branch_department: user.branch_department,
       batch_year: user.batch_year,
+      company_name: user.company_name,
       email_verified: user.email_verified,
       roles: user.roles,
     };
@@ -190,7 +199,7 @@ export class AuthService {
     const existing = await User.findById(userId);
     if (!existing) throw new ApiError(404, 'User not found');
 
-    if (data.email && !isOfficialUniversityEmail(data.email, existing.university)) {
+    if (data.email && existing.account_type === 'student' && existing.university && !isOfficialUniversityEmail(data.email, existing.university)) {
       const allowedDomains = officialEmailDomainsFor(existing.university).join(', ');
       throw new ApiError(
         400,
@@ -220,10 +229,12 @@ export class AuthService {
       lastName: updated.lastName,
       email: updated.email,
       phone: updated.phone,
+      account_type: updated.account_type,
       university: updated.university,
       programme: updated.programme,
       branch_department: updated.branch_department,
       batch_year: updated.batch_year,
+      company_name: updated.company_name,
       email_verified: updated.email_verified,
       roles: updated.roles,
     };

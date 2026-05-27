@@ -8,6 +8,9 @@ import { StudentProfileHistory } from '../models/studentProfileHistory.model';
 import { User } from '../models/user.model';
 import { ApiError } from '../utils/ApiError';
 import { saveMediaFile } from '../utils/mediaStorage';
+import { JobService } from './job.service';
+
+const jobService = new JobService();
 
 export class StudentService {
   private parseJsonFields(data: Record<string, any>, fields: string[]) {
@@ -92,6 +95,7 @@ export class StudentService {
     studentData.profile_completion = calculateProfileCompletion(studentData);
 
     const profile = await Student.create({ user: userId, ...studentData });
+    await jobService.recomputeEligibilityForStudent(userId);
     return profile;
   }
 
@@ -156,6 +160,7 @@ export class StudentService {
       { new: true, runValidators: true }
     );
 
+    await jobService.recomputeEligibilityForStudent(userId);
     return updated;
   }
 
