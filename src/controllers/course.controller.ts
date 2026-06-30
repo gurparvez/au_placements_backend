@@ -24,7 +24,7 @@ export const getAllCourses = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const getCourseById = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const course = await courseService.getById(id);
   res.json({ success: true, data: course });
 });

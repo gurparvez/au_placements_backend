@@ -1,6 +1,7 @@
 import { User, IUser } from '../models/user.model';
 import { ApiError } from '../utils/ApiError';
 import { verifyIdCard } from '../utils/verifyIdCard';
+import { CONFIG } from '../config/environment';
 
 export class AuthService {
   async register(data: {
@@ -11,32 +12,43 @@ export class AuthService {
     email?: string;
     phone?: string;
     university: string;
-    idCardBuffer: Buffer;
-    idCardMimetype: string;
+    idCardBuffer?: Buffer;
+    idCardMimetype?: string;
   }) {
     const { auid, password, firstName, lastName, email, phone, university, idCardBuffer, idCardMimetype } = data;
 
     const existing = await User.findOne({ auid });
     if (existing) throw new ApiError(409, 'User with this AUID already exists.');
 
-    // Gemini ID card verification
-    const { extracted_auid, extracted_university, is_valid_university, matches_auid } =
-      await verifyIdCard(idCardBuffer, idCardMimetype, auid);
+    // ID card verification via Gemini — only when a card was uploaded AND a
+    // GEMINI_API_KEY is configured. Otherwise it's skipped (dev/local), so the
+    // ID card is not compulsory for now.
+    let verified = false;
+    if (CONFIG.geminiApiKey && idCardBuffer && idCardMimetype) {
+      const { extracted_auid, extracted_university, is_valid_university, matches_auid } =
+        await verifyIdCard(idCardBuffer, idCardMimetype, auid);
 
-    if (!is_valid_university || !matches_auid) {
-      throw new ApiError(
-        400,
-        `ID card verification failed. Expected AUID ${auid}, but extracted ${extracted_auid || 'none'}.`
-      );
-    }
+      if (!is_valid_university || !matches_auid) {
+        throw new ApiError(
+          400,
+          `ID card verification failed. Expected AUID ${auid}, but extracted ${extracted_auid || 'none'}.`
+        );
+      }
 
-    const normalizedExtracted = extracted_university?.toLowerCase() || '';
-    const normalizedSelected = university.toLowerCase();
+      const normalizedExtracted = extracted_university?.toLowerCase() || '';
+      const normalizedSelected = university.toLowerCase();
 
-    if (!normalizedExtracted.includes(normalizedSelected)) {
-      throw new ApiError(
-        400,
-        `ID card university mismatch. You selected "${university}", but the ID card belongs to "${extracted_university}".`
+      if (!normalizedExtracted.includes(normalizedSelected)) {
+        throw new ApiError(
+          400,
+          `ID card university mismatch. You selected "${university}", but the ID card belongs to "${extracted_university}".`
+        );
+      }
+
+      verified = true;
+    } else {
+      console.warn(
+        '[auth] Skipping ID-card verification (no GEMINI_API_KEY configured or no card uploaded).'
       );
     }
 
@@ -49,7 +61,7 @@ export class AuthService {
       phone,
       university,
       roles: ['student'],
-      verified: true,
+      verified,
     });
 
     return {

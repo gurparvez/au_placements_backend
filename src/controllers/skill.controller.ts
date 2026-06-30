@@ -24,7 +24,7 @@ export const getAllSkills = asyncHandler(async (req: Request, res: Response) => 
 });
 
 export const getSkillById = asyncHandler(async (req: Request, res: Response) => {
-  const { skillId } = req.params;
+  const skillId = req.params.skillId as string;
   if (!skillId) return res.status(400).json({ success: false, message: 'skillId is required' });
 
   const skill = await skillService.getById(skillId);

@@ -23,11 +23,11 @@ export class StudentService {
   ) {
     if (files?.['profile_image']?.[0]) {
       const uploaded: any = await uploadToCloudinary(files['profile_image'][0].buffer, 'students/profile_images');
-      data.profile_image = uploaded.secure_url;
+      if (uploaded?.secure_url) data.profile_image = uploaded.secure_url;
     }
     if (files?.['resume']?.[0]) {
       const uploaded: any = await uploadToCloudinary(files['resume'][0].buffer, 'students/resumes');
-      data.resume_link = uploaded.secure_url;
+      if (uploaded?.secure_url) data.resume_link = uploaded.secure_url;
     }
     return data;
   }

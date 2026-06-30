@@ -9,14 +9,12 @@ const authService = new AuthService();
 export const registerUser = asyncHandler(async (req: Request, res: Response) => {
   const { auid, password, firstName, lastName, email, phone, university } = req.body;
 
-  if (!req.file) {
-    throw new ApiError(400, 'ID card image is required.');
-  }
-
+  // ID card is optional for now — verification runs only when a card is
+  // provided AND a Gemini API key is configured (see AuthService.register).
   const user = await authService.register({
     auid, password, firstName, lastName, email, phone, university,
-    idCardBuffer: req.file.buffer,
-    idCardMimetype: req.file.mimetype,
+    idCardBuffer: req.file?.buffer,
+    idCardMimetype: req.file?.mimetype,
   });
 
   res.status(201).json({
