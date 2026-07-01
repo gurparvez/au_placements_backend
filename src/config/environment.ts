@@ -21,5 +21,4 @@ export const CONFIG = {
     apiKey: process.env.CLOUDINARY_API_KEY || '',
     apiSecret: process.env.CLOUDINARY_API_SECRET || '',
   },
-  geminiApiKey: process.env.GEMINI_API_KEY || '',
 };

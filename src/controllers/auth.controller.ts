@@ -6,24 +6,6 @@ import { CONFIG } from '../config/environment';
 
 const authService = new AuthService();
 
-export const registerUser = asyncHandler(async (req: Request, res: Response) => {
-  const { auid, password, firstName, lastName, email, phone, university } = req.body;
-
-  // ID card is optional for now — verification runs only when a card is
-  // provided AND a Gemini API key is configured (see AuthService.register).
-  const user = await authService.register({
-    auid, password, firstName, lastName, email, phone, university,
-    idCardBuffer: req.file?.buffer,
-    idCardMimetype: req.file?.mimetype,
-  });
-
-  res.status(201).json({
-    success: true,
-    message: 'User registered successfully.',
-    data: user,
-  });
-});
-
 export const loginUser = asyncHandler(async (req: Request, res: Response) => {
   const { auid, password } = req.body;
 

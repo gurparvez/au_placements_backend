@@ -1,78 +1,7 @@
-import { User, IUser } from '../models/user.model';
+import { User } from '../models/user.model';
 import { ApiError } from '../utils/ApiError';
-import { verifyIdCard } from '../utils/verifyIdCard';
-import { CONFIG } from '../config/environment';
 
 export class AuthService {
-  async register(data: {
-    auid: string;
-    password: string;
-    firstName: string;
-    lastName?: string;
-    email?: string;
-    phone?: string;
-    university: string;
-    idCardBuffer?: Buffer;
-    idCardMimetype?: string;
-  }) {
-    const { auid, password, firstName, lastName, email, phone, university, idCardBuffer, idCardMimetype } = data;
-
-    const existing = await User.findOne({ auid });
-    if (existing) throw new ApiError(409, 'User with this AUID already exists.');
-
-    // ID card verification via Gemini — only when a card was uploaded AND a
-    // GEMINI_API_KEY is configured. Otherwise it's skipped (dev/local), so the
-    // ID card is not compulsory for now.
-    let verified = false;
-    if (CONFIG.geminiApiKey && idCardBuffer && idCardMimetype) {
-      const { extracted_auid, extracted_university, is_valid_university, matches_auid } =
-        await verifyIdCard(idCardBuffer, idCardMimetype, auid);
-
-      if (!is_valid_university || !matches_auid) {
-        throw new ApiError(
-          400,
-          `ID card verification failed. Expected AUID ${auid}, but extracted ${extracted_auid || 'none'}.`
-        );
-      }
-
-      const normalizedExtracted = extracted_university?.toLowerCase() || '';
-      const normalizedSelected = university.toLowerCase();
-
-      if (!normalizedExtracted.includes(normalizedSelected)) {
-        throw new ApiError(
-          400,
-          `ID card university mismatch. You selected "${university}", but the ID card belongs to "${extracted_university}".`
-        );
-      }
-
-      verified = true;
-    } else {
-      console.warn(
-        '[auth] Skipping ID-card verification (no GEMINI_API_KEY configured or no card uploaded).'
-      );
-    }
-
-    const user = await User.create({
-      auid,
-      password,
-      firstName,
-      lastName,
-      email,
-      phone,
-      university,
-      roles: ['student'],
-      verified,
-    });
-
-    return {
-      _id: user._id,
-      auid: user.auid,
-      firstName: user.firstName,
-      university: user.university,
-      roles: user.roles,
-    };
-  }
-
   async login(auid: string, password: string) {
     const user = await User.findOne({ auid });
     if (!user) throw new ApiError(401, 'Invalid AUID or password.');

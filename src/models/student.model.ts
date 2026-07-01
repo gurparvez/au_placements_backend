@@ -36,11 +36,15 @@ interface IProject {
 }
 
 interface IEducation {
+  level: 'university' | 'school';
   institute: string;
-  from_date: Date;
-  to_date: Date;
-  course: Types.ObjectId;
-  specialization?: string;
+  from_date?: Date;
+  to_date?: Date;
+  course?: Types.ObjectId; // university only
+  specialization?: string; // university only
+  board?: string; // school only (e.g. CBSE, ICSE, PSEB)
+  grade?: string; // school only (e.g. 10th, 12th)
+  passing_year?: number; // school only
 }
 
 interface IStudent extends Document {
@@ -112,11 +116,15 @@ const ProjectSchema = new Schema<IProject>({
 });
 
 const EducationSchema = new Schema<IEducation>({
+  level: { type: String, enum: ['university', 'school'], default: 'university' },
   institute: { type: String, required: true },
-  from_date: { type: Date, required: true },
-  to_date: { type: Date, required: true },
-  course: { type: Schema.Types.ObjectId, ref: 'Course', required: true },
-  specialization: { type: String },
+  from_date: { type: Date },
+  to_date: { type: Date },
+  course: { type: Schema.Types.ObjectId, ref: 'Course' }, // university only
+  specialization: { type: String }, // university only
+  board: { type: String }, // school only
+  grade: { type: String }, // school only
+  passing_year: { type: Number }, // school only
 });
 
 /* ---------------------- Student Schema ---------------------- */

@@ -45,11 +45,13 @@ const userSchema: Schema = new Schema(
       type: String,
       required: false,
       unique: true,
+      sparse: true,
     },
     phone: {
       type: String,
       required: false,
       unique: true,
+      sparse: true,
     },
 
     university: {
