@@ -21,4 +21,10 @@ export const CONFIG = {
     apiKey: process.env.CLOUDINARY_API_KEY || '',
     apiSecret: process.env.CLOUDINARY_API_SECRET || '',
   },
+  email: {
+    // Resend is used for server-side email (recruiter → student outreach).
+    resendApiKey: process.env.RESEND_API_KEY || '',
+    // Verified sender. For quick testing Resend allows "onboarding@resend.dev".
+    from: process.env.EMAIL_FROM || 'Kalgidhar Placements <onboarding@resend.dev>',
+  },
 };

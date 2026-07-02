@@ -1,5 +1,6 @@
 import { User } from '../models/user.model';
 import { Student } from '../models/student.model';
+import { Recruiter } from '../models/recruiter.model';
 import { ApiError } from '../utils/ApiError';
 import { escapeRegex } from '../utils/escapeRegex';
 
@@ -78,6 +79,15 @@ export class UserService {
     return user;
   }
 
+  /** Lightweight search for @mention pickers — active users, name/email match. */
+  async searchForMention(q: string, limit = 8) {
+    if (!q || !q.trim()) return [];
+    const rx = new RegExp(escapeRegex(q.trim()), 'i');
+    return User.find({ status: 'active', $or: [{ firstName: rx }, { lastName: rx }, { email: rx }] })
+      .select('firstName lastName roles')
+      .limit(limit);
+  }
+
   async updateUser(userId: string, data: UpdateUserInput) {
     const user = await User.findById(userId);
     if (!user) throw new ApiError(404, 'User not found.');
@@ -102,8 +112,11 @@ export class UserService {
     const user = await User.findById(userId);
     if (!user) throw new ApiError(404, 'User not found.');
 
-    // Remove the linked student profile (if any) so we don't leave orphans.
-    await Student.deleteOne({ user: userId });
+    // Remove any linked role profile so we don't leave orphans.
+    await Promise.all([
+      Student.deleteOne({ user: userId }),
+      Recruiter.deleteOne({ user: userId }),
+    ]);
     await user.deleteOne();
 
     return { _id: userId };

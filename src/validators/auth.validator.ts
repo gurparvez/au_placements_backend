@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { Request, Response, NextFunction } from 'express';
 
 export const loginSchema = z.object({
-  auid: z.string().min(1, 'AUID is required'),
+  identifier: z.string().min(1, 'AUID or email is required'), // students: auid, recruiters/admin: email
   password: z.string().min(1, 'Password is required'),
 });
 

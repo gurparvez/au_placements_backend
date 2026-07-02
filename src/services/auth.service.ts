@@ -2,12 +2,24 @@ import { User } from '../models/user.model';
 import { ApiError } from '../utils/ApiError';
 
 export class AuthService {
-  async login(auid: string, password: string) {
-    const user = await User.findOne({ auid });
-    if (!user) throw new ApiError(401, 'Invalid AUID or password.');
+  async login(identifier: string, password: string) {
+    // Students sign in with their AUID, recruiters/admins with their email.
+    const user = await User.findOne({ $or: [{ auid: identifier }, { email: identifier }] });
+    if (!user) throw new ApiError(401, 'Invalid credentials.');
 
     const isValid = await user.isPasswordCorrect(password);
-    if (!isValid) throw new ApiError(401, 'Invalid AUID or password.');
+    if (!isValid) throw new ApiError(401, 'Invalid credentials.');
+
+    // Only active accounts may sign in.
+    if (user.status !== 'active') {
+      const message =
+        user.status === 'pending'
+          ? 'Your account is awaiting admin approval.'
+          : user.status === 'rejected'
+            ? 'Your account request was not approved.'
+            : 'Your account has been suspended.';
+      throw new ApiError(403, message);
+    }
 
     const token = user.accessToken();
 
@@ -21,6 +33,7 @@ export class AuthService {
         email: user.email,
         university: user.university,
         roles: user.roles,
+        status: user.status,
       },
     };
   }
@@ -38,6 +51,7 @@ export class AuthService {
       phone: user.phone,
       university: user.university,
       roles: user.roles,
+      status: user.status,
     };
   }
 

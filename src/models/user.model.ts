@@ -3,17 +3,21 @@ import jwt, { Secret, SignOptions } from 'jsonwebtoken';
 import mongoose, { Document, Schema } from 'mongoose';
 import { ApiError } from '../utils/ApiError';
 
+type Role = 'student' | 'recruiter' | 'admin';
+type UserStatus = 'active' | 'pending' | 'suspended' | 'rejected';
+
 interface IUser extends Document {
-  auid: string;
+  auid?: string; // students only
   password: string;
   firstName: string;
   lastName: string;
-  email: string;
-  phone: string;
+  email?: string; // login id for recruiter/admin
+  phone?: string;
 
-  university: 'Akal University' | 'Eternal University';
+  university?: 'Akal University' | 'Eternal University'; // students only
 
-  roles: ('student' | 'admin')[];
+  roles: Role[];
+  status: UserStatus;
 
   isPasswordCorrect(password: String): Promise<boolean>;
   accessToken(): String;
@@ -24,8 +28,8 @@ const userSchema: Schema = new Schema(
     auid: {
       type: String,
       unique: true,
-      required: true,
-      index: true,
+      sparse: true, // students have one; recruiters/admin may not
+      required: false,
     },
     password: {
       type: String,
@@ -57,17 +61,19 @@ const userSchema: Schema = new Schema(
     university: {
       type: String,
       enum: ['Akal University', 'Eternal University'],
-      required: true,
+      required: false, // students only
     },
 
     roles: {
       type: [String],
-      enum: ['student', 'admin'],
+      enum: ['student', 'recruiter', 'admin'],
       default: ['student'],
     },
-    verified: {
-      type: Boolean,
-      default: false,
+    status: {
+      type: String,
+      enum: ['active', 'pending', 'suspended', 'rejected'],
+      default: 'active',
+      index: true,
     },
   },
   {
@@ -114,4 +120,4 @@ userSchema.methods.isPasswordCorrect = async function (password: string) {
 const User = mongoose.model<IUser>('User', userSchema);
 
 export { User };
-export type { IUser };
+export type { IUser, Role, UserStatus };

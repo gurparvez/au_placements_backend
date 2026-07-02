@@ -8,8 +8,10 @@ import {
   updatePassword,
   updateUserInfo,
 } from '../controllers/auth.controller';
+import { requestRecruiter } from '../controllers/recruiter.controller';
 import { verifyJwt } from '../middlewares/auth.middleware';
 import { validate, loginSchema } from '../validators/auth.validator';
+import { recruiterRequestSchema } from '../validators/recruiter.validator';
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -22,6 +24,8 @@ const authLimiter = rateLimit({
 const router = Router();
 
 router.post('/login', authLimiter, validate(loginSchema), loginUser);
+// Public: recruiters request an account (created pending, admin approves).
+router.post('/recruiter-request', authLimiter, validate(recruiterRequestSchema), requestRecruiter);
 router.get('/user', verifyJwt, getUser);
 router.post('/logout', verifyJwt, logoutUser);
 router.put('/update', verifyJwt, updateUserInfo);

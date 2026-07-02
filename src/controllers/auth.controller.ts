@@ -7,9 +7,9 @@ import { CONFIG } from '../config/environment';
 const authService = new AuthService();
 
 export const loginUser = asyncHandler(async (req: Request, res: Response) => {
-  const { auid, password } = req.body;
+  const { identifier, password } = req.body;
 
-  const { token, user } = await authService.login(auid, password);
+  const { token, user } = await authService.login(identifier, password);
 
   const isProduction = CONFIG.env === 'production';
   res.cookie('token', token, {
