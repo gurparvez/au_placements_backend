@@ -77,6 +77,21 @@ export class PostService {
     return { posts: data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
+  async listByAuthor(authorId: string, page: number, limit: number, skip: number, viewerId?: string) {
+    // A viewer sees an author's non-archived posts; the author also sees their own archived ones.
+    const filter: Record<string, any> =
+      viewerId && String(viewerId) === String(authorId)
+        ? { author: authorId }
+        : { author: authorId, archived: { $ne: true } };
+
+    const [posts, total] = await Promise.all([
+      this.baseQuery(Post.find(filter)).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Post.countDocuments(filter),
+    ]);
+    const data = await this.attachMyReaction(posts, viewerId);
+    return { posts: data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+  }
+
   async setArchived(id: string, actor: Actor, archived: boolean) {
     const post = await this.ownedOrThrow(id, actor);
     post.archived = archived;

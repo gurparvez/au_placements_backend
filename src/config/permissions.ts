@@ -14,9 +14,11 @@ export type Permission =
   | 'notification:read:own'
   | 'profile:write:own'
   | 'opening:read'
+  | 'opening:apply'
   | 'opening:create'
   | 'opening:update:own'
   | 'outreach:send'
+  | 'student:browse'
   | 'connection:manage'
   | 'follow:manage'
   | 'user:manage'
@@ -33,6 +35,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[] | ['*']> = {
     'notification:read:own',
     'profile:write:own',
     'opening:read',
+    'opening:apply',
     'connection:manage',
     'follow:manage',
   ],
@@ -44,6 +47,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[] | ['*']> = {
     'message:send',
     'notification:read:own',
     'outreach:send',
+    'student:browse',
     'opening:create',
     'opening:update:own',
     'opening:read',

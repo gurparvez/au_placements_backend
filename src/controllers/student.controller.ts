@@ -42,3 +42,9 @@ export const getAllStudents = asyncHandler(async (req: Request, res: Response) =
   const result = await studentService.getAllStudents(page, limit, skip);
   res.json({ success: true, data: result.students, pagination: result.pagination });
 });
+
+export const searchStudents = asyncHandler(async (req: Request, res: Response) => {
+  const q = typeof req.query.q === 'string' ? req.query.q : '';
+  const data = await studentService.searchStudents(q);
+  res.json({ success: true, data });
+});

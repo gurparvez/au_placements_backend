@@ -3,6 +3,13 @@ import { Recruiter } from '../models/recruiter.model';
 import { ApiError } from '../utils/ApiError';
 import { escapeRegex } from '../utils/escapeRegex';
 import { notificationService } from './notification.service';
+import { uploadToCloudinary } from '../utils/uploadToCloudinary';
+
+// Company fields a recruiter is allowed to edit on their own profile.
+const EDITABLE_FIELDS = [
+  'company', 'designation', 'company_website', 'industry',
+  'company_size', 'location', 'linkedin_url', 'about', 'work_email',
+] as const;
 
 interface RecruiterInput {
   firstName: string;
@@ -64,6 +71,38 @@ export class RecruiterService {
     });
 
     return { user, recruiter };
+  }
+
+  /** A recruiter's own company profile (user + recruiter details). */
+  async getOwn(userId: string) {
+    const recruiter = await Recruiter.findOne({ user: userId });
+    if (!recruiter) throw new ApiError(404, 'Company profile not found.');
+    const user = await User.findById(userId);
+    return { user: user ? shapeUser(user) : null, profile: recruiter };
+  }
+
+  /** A recruiter updates their own company profile (optionally a new logo). */
+  async updateOwn(userId: string, data: Record<string, any>, logoBuffer?: Buffer) {
+    const recruiter = await Recruiter.findOne({ user: userId });
+    if (!recruiter) throw new ApiError(404, 'Company profile not found.');
+
+    for (const key of EDITABLE_FIELDS) {
+      if (data[key] !== undefined) {
+        const v = typeof data[key] === 'string' ? data[key].trim() : data[key];
+        (recruiter as any)[key] = v === '' ? undefined : v;
+      }
+    }
+    if (!recruiter.company || !String(recruiter.company).trim()) {
+      throw new ApiError(400, 'Company name is required.');
+    }
+
+    if (logoBuffer) {
+      const result = await uploadToCloudinary(logoBuffer, 'company_logos');
+      if (result?.secure_url) recruiter.company_logo = result.secure_url;
+    }
+
+    await recruiter.save();
+    return recruiter;
   }
 
   /** Public self-request → pending. */

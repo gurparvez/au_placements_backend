@@ -1,7 +1,9 @@
 import { Opening } from '../models/opening.model';
 import { Recruiter } from '../models/recruiter.model';
+import { Application } from '../models/application.model';
 import { ApiError } from '../utils/ApiError';
 import { escapeRegex } from '../utils/escapeRegex';
+import { notificationService } from './notification.service';
 
 interface OpeningInput {
   title?: string;
@@ -29,6 +31,7 @@ interface ListFilters {
   university?: string;
   skill?: string;
   status?: string;
+  recruiter?: string;
 }
 
 function toDoc(data: OpeningInput) {
@@ -53,12 +56,29 @@ export class OpeningService {
     return opening.populate('skills');
   }
 
-  async list(filters: ListFilters, page: number, limit: number, skip: number) {
+  // Attach application_count (and has_applied for a viewing student) to openings.
+  private async decorate(openings: any[], viewerId?: string) {
+    if (!openings.length) return [];
+    const ids = openings.map((o) => o._id);
+    const [counts, mine] = await Promise.all([
+      Application.aggregate([{ $match: { opening: { $in: ids } } }, { $group: { _id: '$opening', count: { $sum: 1 } } }]),
+      viewerId ? Application.find({ opening: { $in: ids }, student: viewerId }).select('opening') : Promise.resolve([]),
+    ]);
+    const countMap = new Map(counts.map((c: any) => [String(c._id), c.count]));
+    const appliedSet = new Set((mine as any[]).map((a) => String(a.opening)));
+    return openings.map((o) => {
+      const plain = o.toObject ? o.toObject() : o;
+      return { ...plain, application_count: countMap.get(String(o._id)) || 0, has_applied: appliedSet.has(String(o._id)) };
+    });
+  }
+
+  async list(filters: ListFilters, page: number, limit: number, skip: number, viewerId?: string) {
     const query: Record<string, any> = {};
     query.status = filters.status || 'open';
     if (filters.type) query.type = filters.type;
     if (filters.university) query.eligible_universities = filters.university;
     if (filters.skill) query.skills = filters.skill;
+    if (filters.recruiter) query.recruiter = filters.recruiter;
     if (filters.q && filters.q.trim()) {
       const rx = new RegExp(escapeRegex(filters.q.trim()), 'i');
       query.$or = [{ title: rx }, { company: rx }, { location: rx }];
@@ -69,15 +89,15 @@ export class OpeningService {
       Opening.countDocuments(query),
     ]);
 
-    return { openings, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return { openings: await this.decorate(openings, viewerId), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
-  async getById(id: string) {
+  async getById(id: string, viewerId?: string) {
     const opening = await Opening.findById(id)
       .populate('skills')
       .populate('recruiter', 'firstName lastName');
     if (!opening) throw new ApiError(404, 'Opening not found.');
-    return opening;
+    return (await this.decorate([opening], viewerId))[0];
   }
 
   async listMine(recruiterUserId: string, page: number, limit: number, skip: number) {
@@ -85,7 +105,46 @@ export class OpeningService {
       Opening.find({ recruiter: recruiterUserId }).populate('skills').sort({ createdAt: -1 }).skip(skip).limit(limit),
       Opening.countDocuments({ recruiter: recruiterUserId }),
     ]);
-    return { openings, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return { openings: await this.decorate(openings), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+  }
+
+  /** A student applies to an open opening. Idempotent-ish: duplicate → 409. */
+  async apply(openingId: string, studentUserId: string) {
+    const opening = await Opening.findById(openingId);
+    if (!opening) throw new ApiError(404, 'Opening not found.');
+    if (opening.status !== 'open') throw new ApiError(400, 'This opening is no longer accepting applications.');
+
+    const existing = await Application.findOne({ opening: openingId, student: studentUserId });
+    if (existing) throw new ApiError(409, 'You have already applied to this opening.');
+
+    await Application.create({ opening: openingId, student: studentUserId, recruiter: opening.recruiter });
+
+    await notificationService.create({
+      recipient: opening.recruiter,
+      actor: studentUserId,
+      type: 'application',
+      entity: { kind: 'opening', id: opening._id },
+      text: `applied to your opening "${opening.title}"`,
+    });
+
+    const application_count = await Application.countDocuments({ opening: openingId });
+    return { applied: true, application_count };
+  }
+
+  /** The opening owner (or admin) lists who applied. */
+  async listApplicants(openingId: string, actor: Actor) {
+    await this.ownedOrThrow(openingId, actor);
+    const apps = await Application.find({ opening: openingId })
+      .populate('student', 'firstName lastName auid university')
+      .sort({ createdAt: -1 });
+    return apps.map((a: any) => ({
+      _id: a._id,
+      status: a.status,
+      appliedAt: a.createdAt,
+      student: a.student
+        ? { _id: a.student._id, firstName: a.student.firstName, lastName: a.student.lastName, auid: a.student.auid, university: a.student.university }
+        : null,
+    }));
   }
 
   private async ownedOrThrow(id: string, actor: Actor) {

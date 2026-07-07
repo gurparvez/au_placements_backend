@@ -51,6 +51,35 @@ export class FollowService {
     }));
   }
 
+  /** Single company profile (public; personalized is_following when logged in). */
+  async getCompany(viewerId: string | undefined, companyUserId: string) {
+    const user = await User.findById(companyUserId).select('_id firstName lastName roles');
+    if (!user || !user.roles.includes('recruiter')) throw new ApiError(404, 'Company not found.');
+    const r: any = await Recruiter.findOne({ user: companyUserId });
+    if (!r) throw new ApiError(404, 'Company not found.');
+
+    const [followers, mine] = await Promise.all([
+      Follow.countDocuments({ company: companyUserId }),
+      viewerId ? Follow.findOne({ follower: viewerId, company: companyUserId }) : Promise.resolve(null),
+    ]);
+
+    return {
+      companyUserId: user._id,
+      company: r.company,
+      industry: r.industry,
+      location: r.location,
+      logo: r.company_logo,
+      website: r.company_website,
+      company_size: r.company_size,
+      designation: r.designation,
+      linkedin_url: r.linkedin_url,
+      about: r.about,
+      contact: `${(user as any).firstName ?? ''} ${(user as any).lastName ?? ''}`.trim() || undefined,
+      followers,
+      is_following: !!mine,
+    };
+  }
+
   /** Public directory of companies (recruiter profiles for active recruiters). */
   async listCompanies(viewerId: string | undefined, page: number, limit: number, skip: number, q?: string) {
     const userFilter: Record<string, any> = { roles: 'recruiter', status: 'active' };

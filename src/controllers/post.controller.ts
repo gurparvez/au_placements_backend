@@ -20,6 +20,12 @@ export const listFeed = asyncHandler(async (req: Request, res: Response) => {
   res.json({ success: true, data: result.posts, pagination: result.pagination });
 });
 
+export const listByUser = asyncHandler(async (req: Request, res: Response) => {
+  const { page, limit, skip } = getPagination(req);
+  const result = await postService.listByAuthor(String(req.params.userId), page, limit, skip, viewerId(res));
+  res.json({ success: true, data: result.posts, pagination: result.pagination });
+});
+
 export const getPost = asyncHandler(async (req: Request, res: Response) => {
   const post = await postService.getById(String(req.params.id), viewerId(res));
   res.json({ success: true, data: post });

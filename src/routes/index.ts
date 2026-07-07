@@ -11,6 +11,7 @@ import notificationRoutes from './notification.routes';
 import openingRoutes from './opening.routes';
 import outreachRoutes from './outreach.routes';
 import postRoutes from './post.routes';
+import recruiterRoutes from './recruiter.routes';
 import skillRoutes from './skill.routes';
 import studentRoutes from './student.routes';
 import userRoutes from './user.routes';
@@ -35,5 +36,6 @@ router.use('/conversations', conversationRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/connections', connectionRoutes);
 router.use('/companies', companyRoutes);
+router.use('/recruiter', recruiterRoutes);
 
 export default router;

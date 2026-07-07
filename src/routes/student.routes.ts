@@ -4,6 +4,7 @@ import {
   getAllStudents,
   getAnyStudentProfile,
   getStudentProfile,
+  searchStudents,
   updateStudentProfile,
 } from '../controllers/student.controller';
 import { verifyJwt } from '../middlewares/auth.middleware';
@@ -33,7 +34,8 @@ router.put(
   validate(updateProfileSchema),
   updateStudentProfile
 );
-router.get('/all', getAllStudents);             // Public: recruiters can browse
+router.get('/all', getAllStudents);             // Public: anyone can explore students
+router.get('/search', searchStudents);          // Public: search students by name or AUID
 router.get('/profile', getAnyStudentProfile);   // Public: recruiters can view profiles
 
 export default router;

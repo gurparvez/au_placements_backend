@@ -15,6 +15,19 @@ export const requestRecruiter = asyncHandler(async (req: Request, res: Response)
   });
 });
 
+// Recruiter: get own company profile.
+export const getMyRecruiterProfile = asyncHandler(async (_req: Request, res: Response) => {
+  const result = await recruiterService.getOwn(String(res.locals.user._id));
+  res.json({ success: true, data: result });
+});
+
+// Recruiter: update own company profile (optional logo upload).
+export const updateMyRecruiterProfile = asyncHandler(async (req: Request, res: Response) => {
+  const logo = (req.file as Express.Multer.File | undefined)?.buffer;
+  const result = await recruiterService.updateOwn(String(res.locals.user._id), req.body, logo);
+  res.json({ success: true, message: 'Company profile updated', data: result });
+});
+
 // Admin: create an already-approved recruiter.
 export const createRecruiter = asyncHandler(async (req: Request, res: Response) => {
   const result = await recruiterService.createByAdmin(req.body);

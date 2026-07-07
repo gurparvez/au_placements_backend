@@ -6,6 +6,7 @@ import {
   createPost,
   deletePost,
   getPost,
+  listByUser,
   listComments,
   listFeed,
   reactToPost,
@@ -37,6 +38,7 @@ const upload = multer({
 
 // Feed + single post: public, personalized if logged in.
 router.get('/', optionalAuth, listFeed);
+router.get('/user/:userId', optionalAuth, listByUser); // posts by a specific author (declared before '/:id')
 router.get('/:id', optionalAuth, getPost);
 
 // Authoring — accepts up to 4 images (multipart) or a JSON body.

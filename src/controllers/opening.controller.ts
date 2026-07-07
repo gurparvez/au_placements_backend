@@ -4,6 +4,7 @@ import { asyncHandler } from '../utils/handler';
 import { getPagination } from '../utils/paginate';
 
 const openingService = new OpeningService();
+const viewerId = (res: Response) => (res.locals.user ? String(res.locals.user._id) : undefined);
 
 // Public: browse open positions with filters.
 export const listOpenings = asyncHandler(async (req: Request, res: Response) => {
@@ -14,8 +15,9 @@ export const listOpenings = asyncHandler(async (req: Request, res: Response) => 
     university: typeof req.query.university === 'string' ? req.query.university : undefined,
     skill: typeof req.query.skill === 'string' ? req.query.skill : undefined,
     status: typeof req.query.status === 'string' ? req.query.status : undefined,
+    recruiter: typeof req.query.recruiter === 'string' ? req.query.recruiter : undefined,
   };
-  const result = await openingService.list(filters, page, limit, skip);
+  const result = await openingService.list(filters, page, limit, skip, viewerId(res));
   res.json({ success: true, data: result.openings, pagination: result.pagination });
 });
 
@@ -28,8 +30,20 @@ export const listMyOpenings = asyncHandler(async (req: Request, res: Response) =
 
 // Public: single opening.
 export const getOpening = asyncHandler(async (req: Request, res: Response) => {
-  const opening = await openingService.getById(String(req.params.id));
+  const opening = await openingService.getById(String(req.params.id), viewerId(res));
   res.json({ success: true, data: opening });
+});
+
+// Student: apply to an opening.
+export const applyToOpening = asyncHandler(async (req: Request, res: Response) => {
+  const result = await openingService.apply(String(req.params.id), String(res.locals.user._id));
+  res.status(201).json({ success: true, message: 'Application submitted', data: result });
+});
+
+// Recruiter/owner: see who applied.
+export const listApplicants = asyncHandler(async (req: Request, res: Response) => {
+  const data = await openingService.listApplicants(String(req.params.id), res.locals.user);
+  res.json({ success: true, data });
 });
 
 // Recruiter: create.

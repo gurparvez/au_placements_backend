@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   followCompany,
+  getCompany,
   listCompanies,
   listFollowing,
   unfollowCompany,
@@ -18,5 +19,8 @@ router.get('/', optionalAuth, listCompanies);
 router.get('/following', verifyJwt, requirePermission('follow:manage'), listFollowing);
 router.post('/:id/follow', verifyJwt, requirePermission('follow:manage'), followCompany);
 router.delete('/:id/follow', verifyJwt, requirePermission('follow:manage'), unfollowCompany);
+
+// Public single company profile (declared after '/following' so it isn't shadowed).
+router.get('/:id', optionalAuth, getCompany);
 
 export default router;

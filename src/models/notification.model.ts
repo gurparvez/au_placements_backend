@@ -10,7 +10,8 @@ export type NotificationType =
   | 'recruiter_rejected'
   | 'connection_request'
   | 'connection_accepted'
-  | 'follow';
+  | 'follow'
+  | 'application';
 
 interface INotification extends Document {
   recipient: Types.ObjectId;
@@ -30,7 +31,7 @@ const NotificationSchema = new Schema<INotification>(
       enum: [
         'reaction', 'comment', 'reply', 'mention', 'message',
         'recruiter_approved', 'recruiter_rejected',
-        'connection_request', 'connection_accepted', 'follow',
+        'connection_request', 'connection_accepted', 'follow', 'application',
       ],
       required: true,
     },

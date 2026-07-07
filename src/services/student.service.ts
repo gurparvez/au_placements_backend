@@ -52,7 +52,8 @@ export class StudentService {
     const profile = await Student.findOne({ user: userId }).populate('skills').populate('education.course');
     if (!profile) throw new ApiError(404, 'Profile not found');
 
-    const user = await User.findById(userId).select('-password -__v');
+    // Phone is private — never expose it on a student's public profile.
+    const user = await User.findById(userId).select('-password -__v -phone');
     return { user, profile };
   }
 
@@ -71,12 +72,26 @@ export class StudentService {
     return updated;
   }
 
+  async searchStudents(q: string, limit = 8) {
+    const term = (q || '').trim();
+    if (!term) return [];
+    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const tokens = term.split(/\s+/).filter(Boolean).slice(0, 4);
+    const and = tokens.map((tok) => {
+      const rx = new RegExp(escape(tok), 'i');
+      return { $or: [{ auid: rx }, { firstName: rx }, { lastName: rx }] };
+    });
+    return User.find({ roles: 'student', $and: and })
+      .select('_id firstName lastName auid university roles')
+      .limit(limit);
+  }
+
   async getAllStudents(page: number, limit: number, skip: number) {
     const [students, total] = await Promise.all([
       Student.find({})
         .populate('skills')
         .populate('education.course')
-        .populate('user', '-password')
+        .populate('user', '-password -phone')
         .skip(skip)
         .limit(limit),
       Student.countDocuments({}),

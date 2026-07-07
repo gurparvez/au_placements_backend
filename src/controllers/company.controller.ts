@@ -14,6 +14,12 @@ export const listCompanies = asyncHandler(async (req: Request, res: Response) =>
   res.json({ success: true, data: result.data, pagination: result.pagination });
 });
 
+// Public single company profile.
+export const getCompany = asyncHandler(async (req: Request, res: Response) => {
+  const data = await followService.getCompany(meId(res), String(req.params.id));
+  res.json({ success: true, data });
+});
+
 export const followCompany = asyncHandler(async (req: Request, res: Response) => {
   const result = await followService.follow(String(res.locals.user._id), String(req.params.id));
   res.json({ success: true, data: result });
