@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import {
+  browseStudents,
   createStudentProfile,
   getAllStudents,
   getAnyStudentProfile,
   getStudentProfile,
   searchStudents,
+  studentFilterMeta,
   updateStudentProfile,
 } from '../controllers/student.controller';
 import { verifyJwt } from '../middlewares/auth.middleware';
@@ -35,6 +37,8 @@ router.put(
   updateStudentProfile
 );
 router.get('/all', getAllStudents);             // Public: anyone can explore students
+router.get('/browse', browseStudents);          // Public: filtered + paginated directory
+router.get('/filters', studentFilterMeta);      // Public: distinct filter options
 router.get('/search', searchStudents);          // Public: search students by name or AUID
 router.get('/profile', getAnyStudentProfile);   // Public: recruiters can view profiles
 

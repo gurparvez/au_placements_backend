@@ -3,6 +3,7 @@ import { Message } from '../models/message.model';
 import { User } from '../models/user.model';
 import { ApiError } from '../utils/ApiError';
 import { notificationService } from './notification.service';
+import { emitToUser } from '../config/socket';
 
 const keyFor = (a: string, b: string) => [String(a), String(b)].sort().join('_');
 const PARTICIPANT_FIELDS = 'firstName lastName roles';
@@ -92,7 +93,11 @@ export class MessageService {
       { arrayFilters: [{ 'o.user': other }] }
     );
 
+    const populated = await message.populate('sender', PARTICIPANT_FIELDS);
+
     if (other) {
+      // Deliver the message live to the recipient's open chat / inbox.
+      emitToUser(other, 'message:new', { conversationId: String(convoId), message: populated });
       await notificationService.create({
         recipient: other,
         actor: meId,
@@ -102,6 +107,6 @@ export class MessageService {
       });
     }
 
-    return message.populate('sender', PARTICIPANT_FIELDS);
+    return populated;
   }
 }

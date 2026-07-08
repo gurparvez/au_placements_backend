@@ -4,6 +4,10 @@ import { Application } from '../models/application.model';
 import { ApiError } from '../utils/ApiError';
 import { escapeRegex } from '../utils/escapeRegex';
 import { notificationService } from './notification.service';
+import { cached, bumpVersion } from '../utils/cache';
+import { CONFIG } from '../config/environment';
+
+const OPENINGS_NS = 'openings';
 
 interface OpeningInput {
   title?: string;
@@ -53,59 +57,82 @@ export class OpeningService {
       recruiter: recruiterUserId,
       company,
     });
+    await bumpVersion(OPENINGS_NS);
     return opening.populate('skills');
   }
 
-  // Attach application_count (and has_applied for a viewing student) to openings.
-  private async decorate(openings: any[], viewerId?: string) {
+  // SHARED (cacheable): application_count is identical for every viewer.
+  private async decorateCounts(openings: any[]) {
     if (!openings.length) return [];
     const ids = openings.map((o) => o._id);
-    const [counts, mine] = await Promise.all([
-      Application.aggregate([{ $match: { opening: { $in: ids } } }, { $group: { _id: '$opening', count: { $sum: 1 } } }]),
-      viewerId ? Application.find({ opening: { $in: ids }, student: viewerId }).select('opening') : Promise.resolve([]),
+    const counts = await Application.aggregate([
+      { $match: { opening: { $in: ids } } },
+      { $group: { _id: '$opening', count: { $sum: 1 } } },
     ]);
     const countMap = new Map(counts.map((c: any) => [String(c._id), c.count]));
-    const appliedSet = new Set((mine as any[]).map((a) => String(a.opening)));
     return openings.map((o) => {
       const plain = o.toObject ? o.toObject() : o;
-      return { ...plain, application_count: countMap.get(String(o._id)) || 0, has_applied: appliedSet.has(String(o._id)) };
+      return { ...plain, application_count: countMap.get(String(o._id)) || 0 };
     });
   }
 
+  // PER-VIEWER (never cached): a cheap indexed lookup layered over the shared cache,
+  // so one student's application doesn't invalidate the list for everyone else.
+  private async applyHasApplied(list: any[], viewerId?: string) {
+    if (!viewerId || !list.length) return list.map((o) => ({ ...o, has_applied: false }));
+    const ids = list.map((o) => o._id);
+    const mine = await Application.find({ opening: { $in: ids }, student: viewerId }).select('opening').lean();
+    const applied = new Set(mine.map((a: any) => String(a.opening)));
+    return list.map((o) => ({ ...o, has_applied: applied.has(String(o._id)) }));
+  }
+
   async list(filters: ListFilters, page: number, limit: number, skip: number, viewerId?: string) {
-    const query: Record<string, any> = {};
-    query.status = filters.status || 'open';
-    if (filters.type) query.type = filters.type;
-    if (filters.university) query.eligible_universities = filters.university;
-    if (filters.skill) query.skills = filters.skill;
-    if (filters.recruiter) query.recruiter = filters.recruiter;
-    if (filters.q && filters.q.trim()) {
-      const rx = new RegExp(escapeRegex(filters.q.trim()), 'i');
-      query.$or = [{ title: rx }, { company: rx }, { location: rx }];
-    }
+    // Shared list (no viewer in the key) → one cache entry serves all users.
+    const shared = await cached(
+      OPENINGS_NS,
+      ['list', filters.status, filters.type, filters.university, filters.skill, filters.recruiter, filters.q?.trim().toLowerCase(), page, limit],
+      CONFIG.cache.defaultTtl,
+      async () => {
+        const query: Record<string, any> = {};
+        query.status = filters.status || 'open';
+        if (filters.type) query.type = filters.type;
+        if (filters.university) query.eligible_universities = filters.university;
+        if (filters.skill) query.skills = filters.skill;
+        if (filters.recruiter) query.recruiter = filters.recruiter;
+        if (filters.q && filters.q.trim()) {
+          const rx = new RegExp(escapeRegex(filters.q.trim()), 'i');
+          query.$or = [{ title: rx }, { company: rx }, { location: rx }];
+        }
 
-    const [openings, total] = await Promise.all([
-      Opening.find(query).populate('skills').sort({ createdAt: -1 }).skip(skip).limit(limit),
-      Opening.countDocuments(query),
-    ]);
+        const [openings, total] = await Promise.all([
+          Opening.find(query).populate('skills').sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+          Opening.countDocuments(query),
+        ]);
 
-    return { openings: await this.decorate(openings, viewerId), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+        return { openings: await this.decorateCounts(openings), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+      }
+    );
+    return { openings: await this.applyHasApplied(shared.openings, viewerId), pagination: shared.pagination };
   }
 
   async getById(id: string, viewerId?: string) {
-    const opening = await Opening.findById(id)
-      .populate('skills')
-      .populate('recruiter', 'firstName lastName');
-    if (!opening) throw new ApiError(404, 'Opening not found.');
-    return (await this.decorate([opening], viewerId))[0];
+    const shared = await cached(OPENINGS_NS, ['one', id], CONFIG.cache.defaultTtl, async () => {
+      const opening = await Opening.findById(id)
+        .populate('skills')
+        .populate('recruiter', 'firstName lastName')
+        .lean();
+      if (!opening) throw new ApiError(404, 'Opening not found.');
+      return (await this.decorateCounts([opening]))[0];
+    });
+    return (await this.applyHasApplied([shared], viewerId))[0];
   }
 
   async listMine(recruiterUserId: string, page: number, limit: number, skip: number) {
     const [openings, total] = await Promise.all([
-      Opening.find({ recruiter: recruiterUserId }).populate('skills').sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Opening.find({ recruiter: recruiterUserId }).populate('skills').sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       Opening.countDocuments({ recruiter: recruiterUserId }),
     ]);
-    return { openings: await this.decorate(openings), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return { openings: await this.decorateCounts(openings), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   /** A student applies to an open opening. Idempotent-ish: duplicate → 409. */
@@ -128,6 +155,7 @@ export class OpeningService {
     });
 
     const application_count = await Application.countDocuments({ opening: openingId });
+    await bumpVersion(OPENINGS_NS); // application_count / has_applied changed
     return { applied: true, application_count };
   }
 
@@ -160,6 +188,7 @@ export class OpeningService {
     const opening = await this.ownedOrThrow(id, actor);
     Object.assign(opening, toDoc(data));
     await opening.save();
+    await bumpVersion(OPENINGS_NS);
     return opening.populate('skills');
   }
 
@@ -167,12 +196,14 @@ export class OpeningService {
     const opening = await this.ownedOrThrow(id, actor);
     opening.status = status;
     await opening.save();
+    await bumpVersion(OPENINGS_NS);
     return opening.populate('skills');
   }
 
   async remove(id: string, actor: Actor) {
     const opening = await this.ownedOrThrow(id, actor);
     await opening.deleteOne();
+    await bumpVersion(OPENINGS_NS);
     return { _id: id };
   }
 }

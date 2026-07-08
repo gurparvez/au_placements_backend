@@ -1,4 +1,5 @@
 import { Notification, NotificationType } from '../models/notification.model';
+import { emitToUser } from '../config/socket';
 
 interface CreateInput {
   recipient: any;
@@ -20,6 +21,8 @@ export class NotificationService {
         entity: input.entity,
         text: input.text,
       });
+      // Real-time nudge — the client refreshes its bell without polling.
+      emitToUser(input.recipient, 'notification:new', { type: input.type });
     } catch (err) {
       console.error('[notification] create failed:', err);
     }

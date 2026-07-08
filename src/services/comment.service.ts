@@ -76,7 +76,8 @@ export class CommentService {
       .populate('mentions', AUTHOR_FIELDS)
       .sort({ createdAt: 1 });
 
-    const plain = comments.map((c) => c.toObject());
+    // Drop comments whose author was deleted (orphaned populate → null).
+    const plain = comments.map((c) => c.toObject()).filter((c: any) => c.author);
     if (!viewerId) return plain.map((c) => ({ ...c, my_reaction: null }));
 
     const reactions = await Reaction.find({

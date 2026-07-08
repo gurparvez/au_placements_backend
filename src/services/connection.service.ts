@@ -68,10 +68,14 @@ export class ConnectionService {
       .populate('requester', USER_FIELDS)
       .populate('recipient', USER_FIELDS)
       .sort({ updatedAt: -1 });
-    return conns.map((c: any) => {
-      const other = String(c.requester._id) === String(meId) ? c.recipient : c.requester;
-      return { connectionId: c._id, user: other, since: c.updatedAt };
-    });
+    // Skip connections whose other party was deleted (orphaned populate → null).
+    return conns
+      .map((c: any) => {
+        const meIsRequester = c.requester && String(c.requester._id) === String(meId);
+        const other = meIsRequester ? c.recipient : c.requester;
+        return other ? { connectionId: c._id, user: other, since: c.updatedAt } : null;
+      })
+      .filter(Boolean);
   }
 
   async listPending(meId: string) {
@@ -80,8 +84,8 @@ export class ConnectionService {
       Connection.find({ requester: meId, status: 'pending' }).populate('recipient', USER_FIELDS).sort({ createdAt: -1 }),
     ]);
     return {
-      incoming: incoming.map((c: any) => ({ connectionId: c._id, user: c.requester, createdAt: c.createdAt })),
-      outgoing: outgoing.map((c: any) => ({ connectionId: c._id, user: c.recipient, createdAt: c.createdAt })),
+      incoming: incoming.map((c: any) => ({ connectionId: c._id, user: c.requester, createdAt: c.createdAt })).filter((e: any) => e.user),
+      outgoing: outgoing.map((c: any) => ({ connectionId: c._id, user: c.recipient, createdAt: c.createdAt })).filter((e: any) => e.user),
     };
   }
 

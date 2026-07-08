@@ -34,6 +34,7 @@ const ConversationSchema = new Schema<IConversation>(
 );
 
 ConversationSchema.index({ participants: 1 });
+ConversationSchema.index({ participants: 1, last_activity: -1 }); // inbox: my convos, newest first
 
 const Conversation = mongoose.model<IConversation>('Conversation', ConversationSchema);
 

@@ -1,8 +1,20 @@
+import { Types } from 'mongoose';
 import { Post } from '../models/post.model';
 import { Comment } from '../models/comment.model';
 import { Reaction } from '../models/reaction.model';
 import { ApiError } from '../utils/ApiError';
 import { notificationService } from './notification.service';
+
+/** Decode a `<createdAt ISO>_<_id>` feed cursor; returns null if absent/invalid. */
+function parseCursor(cursor?: string): { date: Date; id: Types.ObjectId } | null {
+  if (!cursor) return null;
+  const i = cursor.lastIndexOf('_');
+  if (i < 0) return null;
+  const date = new Date(cursor.slice(0, i));
+  const idStr = cursor.slice(i + 1);
+  if (isNaN(date.getTime()) || !Types.ObjectId.isValid(idStr)) return null;
+  return { date, id: new Types.ObjectId(idStr) };
+}
 
 interface Actor {
   _id: any;
@@ -63,18 +75,33 @@ export class PostService {
     return this.getById(String(post._id), authorId);
   }
 
-  async feed(page: number, limit: number, skip: number, viewerId?: string) {
+  /**
+   * Keyset (cursor) pagination — stable and O(limit) at any depth, unlike
+   * skip/limit which scans+discards `skip` docs and can drift as new posts arrive.
+   * Cursor is `<createdAt ISO>_<_id>`; we page on (createdAt, _id) descending.
+   */
+  async feed({ limit, viewerId, cursor }: { limit: number; viewerId?: string; cursor?: string }) {
     // Hide archived posts from everyone — except the owner still sees their own.
-    const filter: Record<string, any> = viewerId
+    const base: Record<string, any> = viewerId
       ? { $or: [{ archived: { $ne: true } }, { author: viewerId }] }
       : { archived: { $ne: true } };
 
-    const [posts, total] = await Promise.all([
-      this.baseQuery(Post.find(filter)).sort({ createdAt: -1 }).skip(skip).limit(limit),
-      Post.countDocuments(filter),
-    ]);
-    const data = await this.attachMyReaction(posts, viewerId);
-    return { posts: data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    const conds: Record<string, any>[] = [base];
+    const parsed = parseCursor(cursor);
+    if (parsed) {
+      conds.push({ $or: [{ createdAt: { $lt: parsed.date } }, { createdAt: parsed.date, _id: { $lt: parsed.id } }] });
+    }
+    const filter = conds.length > 1 ? { $and: conds } : conds[0];
+
+    const docs = await this.baseQuery(Post.find(filter)).sort({ createdAt: -1, _id: -1 }).limit(limit + 1);
+    const hasMore = docs.length > limit;
+    const pageDocs = hasMore ? docs.slice(0, limit) : docs;
+    // Hide posts whose author was deleted (orphaned populate → null) so clients never choke on it.
+    const data = (await this.attachMyReaction(pageDocs, viewerId)).filter((p: any) => p.author);
+
+    const last: any = pageDocs[pageDocs.length - 1];
+    const nextCursor = hasMore && last ? `${new Date(last.createdAt).toISOString()}_${last._id}` : null;
+    return { posts: data, nextCursor };
   }
 
   async listByAuthor(authorId: string, page: number, limit: number, skip: number, viewerId?: string) {

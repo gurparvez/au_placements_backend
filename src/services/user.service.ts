@@ -1,8 +1,19 @@
 import { User } from '../models/user.model';
 import { Student } from '../models/student.model';
 import { Recruiter } from '../models/recruiter.model';
+import { Post } from '../models/post.model';
+import { Comment } from '../models/comment.model';
+import { Reaction } from '../models/reaction.model';
+import { Connection } from '../models/connection.model';
+import { Follow } from '../models/follow.model';
+import { Application } from '../models/application.model';
+import { Opening } from '../models/opening.model';
+import { Conversation } from '../models/conversation.model';
+import { Message } from '../models/message.model';
+import { Notification } from '../models/notification.model';
 import { ApiError } from '../utils/ApiError';
 import { escapeRegex } from '../utils/escapeRegex';
+import { bumpVersion } from '../utils/cache';
 
 type Role = 'student' | 'admin';
 
@@ -55,7 +66,8 @@ export class UserService {
   }
 
   async listUsers(page: number, limit: number, skip: number, search?: string) {
-    const filter: Record<string, any> = {};
+    // Recruiters are managed under their own tab — keep them out of the Users list.
+    const filter: Record<string, any> = { roles: { $ne: 'recruiter' } };
 
     if (search && search.trim()) {
       const rx = new RegExp(escapeRegex(search.trim()), 'i');
@@ -112,12 +124,36 @@ export class UserService {
     const user = await User.findById(userId);
     if (!user) throw new ApiError(404, 'User not found.');
 
-    // Remove any linked role profile so we don't leave orphans.
+    // Cascade: remove everything that references this user so we never leave
+    // orphaned refs (which surface as null author/user and break clients).
+    const convos = await Conversation.find({ participants: userId }).select('_id').lean();
+    const convoIds = convos.map((c) => c._id);
+
     await Promise.all([
+      // Role profiles
       Student.deleteOne({ user: userId }),
       Recruiter.deleteOne({ user: userId }),
+      // Authored content + engagement
+      Post.deleteMany({ author: userId }),
+      Comment.deleteMany({ author: userId }),
+      Reaction.deleteMany({ user: userId }),
+      // Graph edges
+      Connection.deleteMany({ $or: [{ requester: userId }, { recipient: userId }] }),
+      Follow.deleteMany({ $or: [{ follower: userId }, { company: userId }] }),
+      // Openings they posted + all applications touching this user
+      Opening.deleteMany({ recruiter: userId }),
+      Application.deleteMany({ $or: [{ student: userId }, { recruiter: userId }] }),
+      // Conversations they're in + their messages
+      Conversation.deleteMany({ participants: userId }),
+      Message.deleteMany({ conversation: { $in: convoIds } }),
+      // Notifications to or from them
+      Notification.deleteMany({ $or: [{ recipient: userId }, { actor: userId }] }),
     ]);
+
     await user.deleteOne();
+
+    // Invalidate directory caches the deletion could affect.
+    await Promise.all([bumpVersion('students'), bumpVersion('companies'), bumpVersion('openings')]);
 
     return { _id: userId };
   }

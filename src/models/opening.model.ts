@@ -37,6 +37,11 @@ const OpeningSchema = new Schema<IOpening>(
   { timestamps: true }
 );
 
+// Query-shaped compound indexes:
+OpeningSchema.index({ status: 1, createdAt: -1 });       // public browse (default)
+OpeningSchema.index({ recruiter: 1, createdAt: -1 });    // "my openings" + company profile
+OpeningSchema.index({ eligible_universities: 1, status: 1 }); // filter by university
+
 const Opening = mongoose.model<IOpening>('Opening', OpeningSchema);
 
 export { Opening };

@@ -48,3 +48,40 @@ export const searchStudents = asyncHandler(async (req: Request, res: Response) =
   const data = await studentService.searchStudents(q);
   res.json({ success: true, data });
 });
+
+const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+
+// Public: filtered + paginated student directory (server-side).
+export const browseStudents = asyncHandler(async (req: Request, res: Response) => {
+  const { page, limit } = getPagination(req);
+  const rawSkills = req.query.skills;
+  const skills = typeof rawSkills === 'string'
+    ? rawSkills.split(',').map((s) => s.trim()).filter(Boolean)
+    : Array.isArray(rawSkills)
+      ? (rawSkills as string[]).map((s) => String(s).trim()).filter(Boolean)
+      : undefined;
+
+  const opp = str(req.query.opportunity);
+  const exp = str(req.query.exp);
+  const result = await studentService.browseStudents(
+    {
+      q: str(req.query.q),
+      skills: skills && skills.length ? skills : undefined,
+      university: str(req.query.university),
+      opportunity: opp === 'internship' || opp === 'job' ? opp : undefined,
+      field: str(req.query.field),
+      exp: exp === '0-6' || exp === '6-12' || exp === '12-24' || exp === '24+' ? exp : undefined,
+      from: str(req.query.from),
+      to: str(req.query.to),
+    },
+    page,
+    limit
+  );
+  res.json({ success: true, data: result.students, pagination: result.pagination });
+});
+
+// Public: distinct filter options (preferred fields, …).
+export const studentFilterMeta = asyncHandler(async (_req: Request, res: Response) => {
+  const data = await studentService.filterMeta();
+  res.json({ success: true, data });
+});

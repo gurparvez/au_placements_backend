@@ -4,6 +4,7 @@ import { ApiError } from '../utils/ApiError';
 import { escapeRegex } from '../utils/escapeRegex';
 import { notificationService } from './notification.service';
 import { uploadToCloudinary } from '../utils/uploadToCloudinary';
+import { bumpVersion } from '../utils/cache';
 
 // Company fields a recruiter is allowed to edit on their own profile.
 const EDITABLE_FIELDS = [
@@ -102,6 +103,7 @@ export class RecruiterService {
     }
 
     await recruiter.save();
+    await bumpVersion('companies'); // directory + profile show updated details
     return recruiter;
   }
 
@@ -114,6 +116,7 @@ export class RecruiterService {
   /** Admin creates a recruiter → already active. */
   async createByAdmin(data: RecruiterInput) {
     const { user, recruiter } = await this.createUserAndProfile(data, 'active');
+    await bumpVersion('companies'); // new active company enters the directory
     return { user: shapeUser(user), recruiter };
   }
 
@@ -158,6 +161,7 @@ export class RecruiterService {
       text: 'approved your recruiter account',
     });
 
+    await bumpVersion('companies'); // now an active company in the directory
     return { user: shapeUser(user), recruiter };
   }
 
@@ -181,6 +185,7 @@ export class RecruiterService {
       text: 'reviewed your recruiter request',
     });
 
+    await bumpVersion('companies'); // removed from the active directory
     return { user: shapeUser(user), recruiter };
   }
 }

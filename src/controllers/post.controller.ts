@@ -15,9 +15,10 @@ const viewerId = (res: Response) => (res.locals.user ? String(res.locals.user._i
 /* -------------------------------- posts -------------------------------- */
 
 export const listFeed = asyncHandler(async (req: Request, res: Response) => {
-  const { page, limit, skip } = getPagination(req);
-  const result = await postService.feed(page, limit, skip, viewerId(res));
-  res.json({ success: true, data: result.posts, pagination: result.pagination });
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '10'), 10) || 10, 1), 50);
+  const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+  const result = await postService.feed({ limit, viewerId: viewerId(res), cursor });
+  res.json({ success: true, data: result.posts, nextCursor: result.nextCursor });
 });
 
 export const listByUser = asyncHandler(async (req: Request, res: Response) => {

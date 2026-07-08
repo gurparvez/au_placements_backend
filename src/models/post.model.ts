@@ -42,6 +42,8 @@ const PostSchema = new Schema<IPost>(
 );
 
 PostSchema.index({ createdAt: -1 });
+PostSchema.index({ author: 1, createdAt: -1 });    // posts on a profile
+PostSchema.index({ archived: 1, createdAt: -1 });  // feed (hide archived)
 
 const Post = mongoose.model<IPost>('Post', PostSchema);
 

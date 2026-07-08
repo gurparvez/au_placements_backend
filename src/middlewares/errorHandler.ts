@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ApiError } from '../utils/ApiError';
+import { logger } from '../utils/logger';
 
 export function globalErrorHandler(err: any, req: Request, res: Response, next: NextFunction) {
   // If it's our custom ApiError, use its status code
@@ -15,7 +16,10 @@ export function globalErrorHandler(err: any, req: Request, res: Response, next: 
   const statusCode = err.statusCode || err.status || 500;
   const message = process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message || 'Internal Server Error';
 
-  console.error(`[ERROR] ${req.method} ${req.path}:`, err);
+  logger.error(
+    { reqId: res.locals.reqId, method: req.method, path: req.path, status: statusCode, err: err?.message, stack: err?.stack },
+    'unhandled error'
+  );
 
   res.status(statusCode).json({
     success: false,

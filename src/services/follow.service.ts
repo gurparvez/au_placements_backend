@@ -4,6 +4,10 @@ import { Recruiter } from '../models/recruiter.model';
 import { ApiError } from '../utils/ApiError';
 import { escapeRegex } from '../utils/escapeRegex';
 import { notificationService } from './notification.service';
+import { cached, bumpVersion } from '../utils/cache';
+import { CONFIG } from '../config/environment';
+
+const COMPANIES_NS = 'companies';
 
 export class FollowService {
   private async ensureRecruiter(companyUserId: string) {
@@ -28,12 +32,14 @@ export class FollowService {
       });
     }
     const followers = await Follow.countDocuments({ company: companyUserId });
+    await bumpVersion(COMPANIES_NS); // follower count + is_following changed
     return { following: true, followers };
   }
 
   async unfollow(meId: string, companyUserId: string) {
     await Follow.deleteOne({ follower: meId, company: companyUserId });
     const followers = await Follow.countDocuments({ company: companyUserId });
+    await bumpVersion(COMPANIES_NS);
     return { following: false, followers };
   }
 
@@ -53,15 +59,22 @@ export class FollowService {
 
   /** Single company profile (public; personalized is_following when logged in). */
   async getCompany(viewerId: string | undefined, companyUserId: string) {
-    const user = await User.findById(companyUserId).select('_id firstName lastName roles');
+    // Shared profile + follower count cached once for everyone…
+    const shared = await cached(COMPANIES_NS, ['one', companyUserId], CONFIG.cache.defaultTtl, () =>
+      this._getCompanyShared(companyUserId)
+    );
+    // …is_following is a cheap per-viewer overlay, never cached.
+    const is_following = viewerId ? !!(await Follow.findOne({ follower: viewerId, company: companyUserId }).lean()) : false;
+    return { ...shared, is_following };
+  }
+
+  private async _getCompanyShared(companyUserId: string) {
+    const user = await User.findById(companyUserId).select('_id firstName lastName roles').lean();
     if (!user || !user.roles.includes('recruiter')) throw new ApiError(404, 'Company not found.');
-    const r: any = await Recruiter.findOne({ user: companyUserId });
+    const r: any = await Recruiter.findOne({ user: companyUserId }).lean();
     if (!r) throw new ApiError(404, 'Company not found.');
 
-    const [followers, mine] = await Promise.all([
-      Follow.countDocuments({ company: companyUserId }),
-      viewerId ? Follow.findOne({ follower: viewerId, company: companyUserId }) : Promise.resolve(null),
-    ]);
+    const followers = await Follow.countDocuments({ company: companyUserId });
 
     return {
       companyUserId: user._id,
@@ -76,52 +89,63 @@ export class FollowService {
       about: r.about,
       contact: `${(user as any).firstName ?? ''} ${(user as any).lastName ?? ''}`.trim() || undefined,
       followers,
-      is_following: !!mine,
     };
   }
 
   /** Public directory of companies (recruiter profiles for active recruiters). */
   async listCompanies(viewerId: string | undefined, page: number, limit: number, skip: number, q?: string) {
-    const userFilter: Record<string, any> = { roles: 'recruiter', status: 'active' };
+    // Shared directory (company data + follower counts) cached once for all viewers.
+    const shared = await cached(COMPANIES_NS, ['list', page, limit, q?.trim().toLowerCase()], CONFIG.cache.defaultTtl, async () => {
+      const userFilter: Record<string, any> = { roles: 'recruiter', status: 'active' };
 
-    if (q && q.trim()) {
-      const rx = new RegExp(escapeRegex(q.trim()), 'i');
-      const matched = await Recruiter.find({ company: rx }).select('user');
-      userFilter._id = { $in: matched.map((m) => m.user) };
-    }
+      if (q && q.trim()) {
+        const rx = new RegExp(escapeRegex(q.trim()), 'i');
+        const matched = await Recruiter.find({ company: rx }).select('user').lean();
+        userFilter._id = { $in: matched.map((m) => m.user) };
+      }
 
-    const [users, total] = await Promise.all([
-      User.find(userFilter).select('_id firstName lastName').sort({ createdAt: -1 }).skip(skip).limit(limit),
-      User.countDocuments(userFilter),
-    ]);
-    const userIds = users.map((u) => u._id);
+      const [users, total] = await Promise.all([
+        User.find(userFilter).select('_id firstName lastName').sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+        User.countDocuments(userFilter),
+      ]);
+      const userIds = users.map((u) => u._id);
 
-    const [recruiters, followAgg, myFollows] = await Promise.all([
-      Recruiter.find({ user: { $in: userIds } }),
-      Follow.aggregate([{ $match: { company: { $in: userIds } } }, { $group: { _id: '$company', count: { $sum: 1 } } }]),
-      viewerId ? Follow.find({ follower: viewerId, company: { $in: userIds } }).select('company') : Promise.resolve([]),
-    ]);
+      const [recruiters, followAgg] = await Promise.all([
+        Recruiter.find({ user: { $in: userIds } }).lean(),
+        Follow.aggregate([{ $match: { company: { $in: userIds } } }, { $group: { _id: '$company', count: { $sum: 1 } } }]),
+      ]);
 
-    const byUser = new Map(recruiters.map((r: any) => [String(r.user), r]));
-    const counts = new Map(followAgg.map((f: any) => [String(f._id), f.count]));
-    const following = new Set((myFollows as any[]).map((f) => String(f.company)));
+      const byUser = new Map(recruiters.map((r: any) => [String(r.user), r]));
+      const counts = new Map(followAgg.map((f: any) => [String(f._id), f.count]));
 
-    const data = users
-      .map((u: any) => {
-        const r = byUser.get(String(u._id));
-        if (!r) return null;
-        return {
-          companyUserId: u._id,
-          company: r.company,
-          industry: r.industry,
-          location: r.location,
-          logo: r.company_logo,
-          followers: counts.get(String(u._id)) || 0,
-          is_following: following.has(String(u._id)),
-        };
-      })
-      .filter(Boolean);
+      const data = users
+        .map((u: any) => {
+          const r = byUser.get(String(u._id));
+          if (!r) return null;
+          return {
+            companyUserId: u._id,
+            company: r.company,
+            industry: r.industry,
+            location: r.location,
+            logo: r.company_logo,
+            followers: counts.get(String(u._id)) || 0,
+          };
+        })
+        .filter(Boolean);
 
-    return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+      return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    });
+
+    // Per-viewer is_following overlay — a single indexed query, never cached.
+    const data = await this.applyIsFollowing(shared.data as any[], viewerId);
+    return { data, pagination: shared.pagination };
+  }
+
+  private async applyIsFollowing(companies: any[], viewerId?: string) {
+    if (!viewerId || !companies.length) return companies.map((c) => ({ ...c, is_following: false }));
+    const ids = companies.map((c) => c.companyUserId);
+    const mine = await Follow.find({ follower: viewerId, company: { $in: ids } }).select('company').lean();
+    const following = new Set(mine.map((f: any) => String(f.company)));
+    return companies.map((c) => ({ ...c, is_following: following.has(String(c.companyUserId)) }));
   }
 }
