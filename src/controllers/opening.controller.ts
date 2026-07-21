@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { OpeningService } from '../services/opening.service';
+import { eligibilityService } from '../services/eligibility.service';
 import { asyncHandler } from '../utils/handler';
 import { getPagination } from '../utils/paginate';
 
@@ -43,6 +44,42 @@ export const applyToOpening = asyncHandler(async (req: Request, res: Response) =
 // Recruiter/owner: see who applied.
 export const listApplicants = asyncHandler(async (req: Request, res: Response) => {
   const data = await openingService.listApplicants(String(req.params.id), res.locals.user);
+  res.json({ success: true, data });
+});
+
+// Recruiter/owner: move an applicant along the hiring pipeline.
+export const setApplicantStatus = asyncHandler(async (req: Request, res: Response) => {
+  const data = await openingService.setApplicantStatus(
+    String(req.params.id),
+    String(req.params.applicationId),
+    res.locals.user,
+    String(req.body.status)
+  );
+  res.json({ success: true, message: 'Application updated', data });
+});
+
+// Recruiter/owner: record a selection-round outcome.
+export const setRoundResult = asyncHandler(async (req: Request, res: Response) => {
+  const data = await openingService.setRoundResult(
+    String(req.params.id),
+    String(req.params.applicationId),
+    res.locals.user,
+    Number(req.body.order),
+    req.body.result,
+    req.body.notes
+  );
+  res.json({ success: true, message: 'Round updated', data });
+});
+
+// Anyone signed in: why can (or can't) this student apply?
+export const checkEligibility = asyncHandler(async (req: Request, res: Response) => {
+  const data = await eligibilityService.check(String(req.params.id), String(res.locals.user._id));
+  res.json({ success: true, data });
+});
+
+// TPO: the eligibility waterfall for one opening.
+export const getWaterfall = asyncHandler(async (req: Request, res: Response) => {
+  const data = await eligibilityService.waterfall(String(req.params.id));
   res.json({ success: true, data });
 });
 

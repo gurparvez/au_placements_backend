@@ -1,9 +1,10 @@
 import { Opening } from '../models/opening.model';
 import { Recruiter } from '../models/recruiter.model';
-import { Application } from '../models/application.model';
+import { Application, APPLICATION_STAGES, ROUND_RESULTS, type RoundResult } from '../models/application.model';
 import { ApiError } from '../utils/ApiError';
 import { escapeRegex } from '../utils/escapeRegex';
 import { notificationService } from './notification.service';
+import { eligibilityService } from './eligibility.service';
 import { cached, bumpVersion } from '../utils/cache';
 import { CONFIG } from '../config/environment';
 
@@ -22,6 +23,15 @@ interface OpeningInput {
   apply_url?: string;
   apply_by?: string;
   company?: string;
+
+  min_cgpa?: number;
+  max_backlogs?: number;
+  eligible_departments?: string[];
+  eligible_batches?: number[];
+  allow_placed?: boolean;
+  tier?: 'regular' | 'core' | 'dream';
+  ctc_lpa?: number;
+  rounds?: { name: string; order: number }[];
 }
 
 interface Actor {
@@ -42,6 +52,12 @@ function toDoc(data: OpeningInput) {
   const doc: Record<string, any> = { ...data };
   if (data.apply_by !== undefined) doc.apply_by = data.apply_by ? new Date(data.apply_by) : undefined;
   if (data.apply_url === '') doc.apply_url = undefined;
+  // Renumber rounds so `order` is always 1..n and matches array position.
+  if (Array.isArray(data.rounds)) {
+    doc.rounds = data.rounds
+      .filter((r) => r?.name?.trim())
+      .map((r, i) => ({ name: r.name.trim(), order: i + 1 }));
+  }
   delete doc.company; // company is denormalized separately, never taken raw on update
   return doc;
 }
@@ -135,7 +151,11 @@ export class OpeningService {
     return { openings: await this.decorateCounts(openings), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
-  /** A student applies to an open opening. Idempotent-ish: duplicate → 409. */
+  /**
+   * A student applies to an open opening. Duplicate → 409. Eligibility and the
+   * university's offer policy are enforced here, not just hidden in the UI —
+   * the rejection message names every failing criterion.
+   */
   async apply(openingId: string, studentUserId: string) {
     const opening = await Opening.findById(openingId);
     if (!opening) throw new ApiError(404, 'Opening not found.');
@@ -144,7 +164,23 @@ export class OpeningService {
     const existing = await Application.findOne({ opening: openingId, student: studentUserId });
     if (existing) throw new ApiError(409, 'You have already applied to this opening.');
 
-    await Application.create({ opening: openingId, student: studentUserId, recruiter: opening.recruiter });
+    const { eligible, reasons } = await eligibilityService.check(openingId, studentUserId);
+    if (!eligible) {
+      throw new ApiError(403, `You are not eligible: ${reasons.map((r) => r.message).join('; ')}`);
+    }
+
+    // Seed the round pipeline from the opening so progress is trackable.
+    const rounds = (opening.rounds ?? []).map((r: any) => ({
+      name: r.name, order: r.order, result: 'pending' as const,
+    }));
+
+    await Application.create({
+      opening: openingId,
+      student: studentUserId,
+      recruiter: opening.recruiter,
+      rounds,
+      current_round: 0,
+    });
 
     await notificationService.create({
       recipient: opening.recruiter,
@@ -156,6 +192,7 @@ export class OpeningService {
 
     const application_count = await Application.countDocuments({ opening: openingId });
     await bumpVersion(OPENINGS_NS); // application_count / has_applied changed
+    await bumpVersion('analytics'); // funnel counts changed
     return { applied: true, application_count };
   }
 
@@ -169,10 +206,94 @@ export class OpeningService {
       _id: a._id,
       status: a.status,
       appliedAt: a.createdAt,
+      rounds: a.rounds ?? [],
+      current_round: a.current_round ?? 0,
       student: a.student
         ? { _id: a.student._id, firstName: a.student.firstName, lastName: a.student.lastName, auid: a.student.auid, university: a.student.university }
         : null,
     }));
+  }
+
+  /**
+   * The opening owner (or admin) moves an applicant along the pipeline.
+   * The student is notified of every stage change.
+   */
+  async setApplicantStatus(openingId: string, applicationId: string, actor: Actor, status: string) {
+    if (!(APPLICATION_STAGES as readonly string[]).includes(status)) {
+      throw new ApiError(400, 'Invalid application status.');
+    }
+    const opening = await this.ownedOrThrow(openingId, actor);
+
+    const app = await Application.findOneAndUpdate(
+      { _id: applicationId, opening: openingId },
+      { $set: { status } },
+      { new: true }
+    );
+    if (!app) throw new ApiError(404, 'Application not found.');
+
+    await notificationService.create({
+      recipient: app.student,
+      actor: actor._id,
+      type: 'application',
+      entity: { kind: 'opening', id: opening._id },
+      text: `updated your application for "${opening.title}" to ${status}`,
+    });
+
+    await bumpVersion(OPENINGS_NS);
+    await bumpVersion('analytics');
+    return { _id: app._id, status: app.status };
+  }
+
+  /**
+   * Record a round outcome for one applicant. A failed/absent round ends the
+   * application, so the flat status is kept in sync automatically — the TPO
+   * shouldn't have to update two things.
+   */
+  async setRoundResult(
+    openingId: string,
+    applicationId: string,
+    actor: Actor,
+    roundOrder: number,
+    result: RoundResult,
+    notes?: string
+  ) {
+    if (!(ROUND_RESULTS as readonly string[]).includes(result)) {
+      throw new ApiError(400, 'Invalid round result.');
+    }
+    const opening = await this.ownedOrThrow(openingId, actor);
+
+    const app = await Application.findOne({ _id: applicationId, opening: openingId });
+    if (!app) throw new ApiError(404, 'Application not found.');
+
+    const round = (app.rounds ?? []).find((r: any) => r.order === roundOrder);
+    if (!round) throw new ApiError(404, 'That round is not part of this application.');
+
+    round.result = result;
+    round.date = new Date();
+    if (notes !== undefined) round.notes = notes;
+
+    if (result === 'cleared') {
+      app.current_round = Math.max(app.current_round ?? 0, roundOrder);
+      const total = (app.rounds ?? []).length;
+      // Clearing the final round means an offer.
+      app.status = roundOrder >= total ? 'offered' : 'interviewed';
+    } else if (result === 'failed' || result === 'absent') {
+      app.status = 'rejected';
+    }
+
+    await app.save();
+
+    await notificationService.create({
+      recipient: app.student,
+      actor: actor._id,
+      type: 'application',
+      entity: { kind: 'opening', id: opening._id },
+      text: `marked you ${result} in "${round.name}" for ${opening.title}`,
+    });
+
+    await bumpVersion(OPENINGS_NS);
+    await bumpVersion('analytics');
+    return { _id: app._id, status: app.status, current_round: app.current_round, rounds: app.rounds };
   }
 
   private async ownedOrThrow(id: string, actor: Actor) {

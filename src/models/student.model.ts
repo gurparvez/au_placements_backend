@@ -2,6 +2,32 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 /* ---------------------- Interfaces ---------------------- */
 
+/**
+ * Why a student is (or isn't) in the placement pool. Only 'placement' counts
+ * towards the reported placement percentage — see analytics.service.
+ */
+export const PLACEMENT_INTENTS = [
+  'placement',
+  'higher_studies',
+  'competitive_exam',
+  'entrepreneurship',
+  'family_business',
+  'not_interested',
+  'deferred',
+] as const;
+export type PlacementIntent = (typeof PLACEMENT_INTENTS)[number];
+
+/** Labels for the outcome-composition chart. */
+export const INTENT_LABELS: Record<PlacementIntent, string> = {
+  placement: 'Seeking placement',
+  higher_studies: 'Higher studies',
+  competitive_exam: 'Competitive exams',
+  entrepreneurship: 'Entrepreneurship',
+  family_business: 'Family business',
+  not_interested: 'Opted out',
+  deferred: 'Deferred',
+};
+
 interface ILookingFor {
   type: 'internship' | 'job';
   from_date?: Date;
@@ -60,6 +86,28 @@ interface IStudent extends Document {
   resume_link?: string;
 
   preferred_field?: string;
+
+  /* ---- Current academic record (drives TPC reporting: department / course / batch) ---- */
+  department?: string;
+  course?: Types.ObjectId; // current programme
+  batch_year?: number; // expected graduation year — "batch of 2027"
+  cgpa?: number;
+  backlogs?: number;
+
+  /**
+   * Placement-cell registration. The reported placement percentage divides by
+   * students whose intent is 'placement' — anyone pursuing higher studies or
+   * otherwise opted out must leave the denominator, or the figure is wrong.
+   */
+  placement_intent?: PlacementIntent;
+  opted_out_reason?: string;
+
+  /* ---- Preparation signals: the only *leading* indicators we hold ---- */
+  aptitude_score?: number; // 0–100, latest mock aptitude
+  mock_interviews?: number; // sessions attended
+  mock_interview_score?: number; // 0–10, latest rating
+  training_attendance?: number; // 0–100 %
+  resume_verified?: boolean;
 
   looking_for: ILookingFor;
 
@@ -144,6 +192,26 @@ const StudentSchema = new Schema<IStudent>(
     about: String,
     profile_image: String,
     preferred_field: { type: String },
+
+    department: { type: String, trim: true, index: true },
+    course: { type: Schema.Types.ObjectId, ref: 'Course', index: true },
+    batch_year: { type: Number, min: 1990, max: 2100, index: true },
+    cgpa: { type: Number, min: 0, max: 10 },
+    backlogs: { type: Number, min: 0, default: 0 },
+
+    placement_intent: {
+      type: String,
+      enum: PLACEMENT_INTENTS,
+      default: 'placement',
+      index: true,
+    },
+    opted_out_reason: { type: String },
+
+    aptitude_score: { type: Number, min: 0, max: 100 },
+    mock_interviews: { type: Number, min: 0, default: 0 },
+    mock_interview_score: { type: Number, min: 0, max: 10 },
+    training_attendance: { type: Number, min: 0, max: 100 },
+    resume_verified: { type: Boolean, default: false },
 
     linkedin_url: String,
     github_url: String,

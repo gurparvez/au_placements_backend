@@ -15,7 +15,36 @@ interface IOpening extends Document {
   apply_url?: string;
   apply_by?: Date;
   status: 'open' | 'closed';
+
+  /* ---- Eligibility criteria: what the recruiter demands ---- */
+  min_cgpa?: number;
+  max_backlogs?: number;
+  eligible_departments?: string[]; // empty ⇒ all
+  eligible_batches?: number[]; // empty ⇒ all
+  allow_placed?: boolean; // may already-placed students apply?
+
+  /** Package tier — drives the one-offer policy (see PlacementPolicy). */
+  tier?: OpeningTier;
+  ctc_lpa?: number; // advertised package, for tier checks and analytics
+
+  /** Selection rounds, in order. Applications track progress through these. */
+  rounds?: { name: string; order: number }[];
 }
+
+/**
+ * Dream/core tiering. A student locked by a 'regular' offer may still sit for
+ * 'dream' companies; a 'dream' offer locks them out of everything.
+ */
+export const OPENING_TIERS = ['regular', 'core', 'dream'] as const;
+export type OpeningTier = (typeof OPENING_TIERS)[number];
+
+/** Sensible default pipeline when a recruiter doesn't define one. */
+export const DEFAULT_ROUNDS = [
+  { name: 'Pre-placement talk', order: 1 },
+  { name: 'Aptitude test', order: 2 },
+  { name: 'Technical interview', order: 3 },
+  { name: 'HR interview', order: 4 },
+];
 
 const OpeningSchema = new Schema<IOpening>(
   {
@@ -33,6 +62,20 @@ const OpeningSchema = new Schema<IOpening>(
     apply_url: { type: String },
     apply_by: { type: Date },
     status: { type: String, enum: ['open', 'closed'], default: 'open', index: true },
+
+    min_cgpa: { type: Number, min: 0, max: 10 },
+    max_backlogs: { type: Number, min: 0 },
+    eligible_departments: { type: [String], default: [] },
+    eligible_batches: { type: [Number], default: [] },
+    allow_placed: { type: Boolean, default: false },
+
+    tier: { type: String, enum: OPENING_TIERS, default: 'regular', index: true },
+    ctc_lpa: { type: Number, min: 0 },
+
+    rounds: {
+      type: [{ name: { type: String, required: true }, order: { type: Number, required: true } }],
+      default: () => DEFAULT_ROUNDS,
+    },
   },
   { timestamps: true }
 );

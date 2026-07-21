@@ -54,20 +54,22 @@ export class StudentService {
     if (existing) throw new ApiError(400, 'Profile already exists');
 
     let studentData = { ...body };
+    for (const k of StudentService.TPO_OWNED) delete studentData[k];
     studentData = await this.handleFileUploads(files, studentData);
     studentData = this.parseJsonFields(studentData, ['education', 'experience', 'projects', 'certificates', 'skills', 'looking_for']);
 
     const profile = await Student.create({ user: userId, ...studentData });
     await bumpVersion(STUDENTS_NS); // new profile appears in the directory
+    await bumpVersion('analytics'); // cohort counts changed
     return profile;
   }
 
   async getProfile(userId: string) {
-    return Student.findOne({ user: userId }).populate('skills').populate('education.course');
+    return Student.findOne({ user: userId }).populate('skills').populate('education.course').populate('course');
   }
 
   async getProfileByUserId(userId: string) {
-    const profile = await Student.findOne({ user: userId }).populate('skills').populate('education.course');
+    const profile = await Student.findOne({ user: userId }).populate('skills').populate('education.course').populate('course');
     if (!profile) throw new ApiError(404, 'Profile not found');
 
     // Phone is private — never expose it on a student's public profile.
@@ -75,8 +77,19 @@ export class StudentService {
     return { user, profile };
   }
 
+  /**
+   * Fields only the placement cell may set. CGPA, backlogs and readiness scores
+   * are verified records the TPO reports on — a student editing their own would
+   * make every eligibility check and placement statistic meaningless.
+   */
+  private static readonly TPO_OWNED = [
+    'cgpa', 'backlogs', 'aptitude_score', 'mock_interviews',
+    'mock_interview_score', 'training_attendance', 'resume_verified',
+  ];
+
   async updateProfile(userId: string, body: Record<string, any>, files?: { [fieldname: string]: Express.Multer.File[] }) {
     let updateData: any = { ...body };
+    for (const k of StudentService.TPO_OWNED) delete updateData[k];
     updateData = await this.handleFileUploads(files, updateData);
     updateData = this.parseJsonFields(updateData, ['education', 'experience', 'projects', 'certificates', 'skills', 'looking_for']);
 
@@ -88,6 +101,7 @@ export class StudentService {
 
     if (!updated) throw new ApiError(404, 'Student profile not found');
     await bumpVersion(STUDENTS_NS); // directory card may have changed
+    await bumpVersion('analytics'); // department / batch / cgpa may have changed
     return updated;
   }
 

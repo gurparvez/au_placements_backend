@@ -38,4 +38,24 @@ export class SkillService {
     if (!skill) throw new ApiError(404, 'Skill not found');
     return skill;
   }
+
+  async update(id: string, displayName: string) {
+    const trimmed = (displayName || '').trim();
+    if (!trimmed) throw new ApiError(400, 'Skill name is required.');
+    const skill = await Skill.findByIdAndUpdate(
+      id,
+      { name: trimmed.toLowerCase(), displayName: trimmed },
+      { new: true, runValidators: true }
+    );
+    if (!skill) throw new ApiError(404, 'Skill not found');
+    await bumpVersion('skills');
+    return skill;
+  }
+
+  async remove(id: string) {
+    const skill = await Skill.findByIdAndDelete(id);
+    if (!skill) throw new ApiError(404, 'Skill not found');
+    await bumpVersion('skills');
+    return { _id: id };
+  }
 }

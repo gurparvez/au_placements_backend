@@ -30,3 +30,13 @@ export const getSkillById = asyncHandler(async (req: Request, res: Response) => 
   const skill = await skillService.getById(skillId);
   res.json({ success: true, data: skill });
 });
+
+export const updateSkill = asyncHandler(async (req: Request, res: Response) => {
+  const skill = await skillService.update(String(req.params.skillId), req.body.name ?? req.body.displayName);
+  res.json({ success: true, message: 'Skill updated', data: skill });
+});
+
+export const deleteSkill = asyncHandler(async (req: Request, res: Response) => {
+  const data = await skillService.remove(String(req.params.skillId));
+  res.json({ success: true, message: 'Skill removed', data });
+});

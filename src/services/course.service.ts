@@ -37,4 +37,21 @@ export class CourseService {
     if (!course) throw new ApiError(404, 'Course not found');
     return course;
   }
+
+  async update(id: string, data: { name?: string; category?: string }) {
+    const patch: Record<string, any> = {};
+    if (data.name && data.name.trim()) patch.name = data.name.trim();
+    if (data.category) patch.category = data.category;
+    const course = await Course.findByIdAndUpdate(id, patch, { new: true, runValidators: true });
+    if (!course) throw new ApiError(404, 'Course not found');
+    await bumpVersion('courses');
+    return course;
+  }
+
+  async remove(id: string) {
+    const course = await Course.findByIdAndDelete(id);
+    if (!course) throw new ApiError(404, 'Course not found');
+    await bumpVersion('courses');
+    return { _id: id };
+  }
 }

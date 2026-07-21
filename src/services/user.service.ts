@@ -8,6 +8,7 @@ import { Connection } from '../models/connection.model';
 import { Follow } from '../models/follow.model';
 import { Application } from '../models/application.model';
 import { Opening } from '../models/opening.model';
+import { Placement } from '../models/placement.model';
 import { Conversation } from '../models/conversation.model';
 import { Message } from '../models/message.model';
 import { Notification } from '../models/notification.model';
@@ -143,6 +144,7 @@ export class UserService {
       // Openings they posted + all applications touching this user
       Opening.deleteMany({ recruiter: userId }),
       Application.deleteMany({ $or: [{ student: userId }, { recruiter: userId }] }),
+      Placement.deleteMany({ student: userId }),
       // Conversations they're in + their messages
       Conversation.deleteMany({ participants: userId }),
       Message.deleteMany({ conversation: { $in: convoIds } }),
@@ -153,7 +155,7 @@ export class UserService {
     await user.deleteOne();
 
     // Invalidate directory caches the deletion could affect.
-    await Promise.all([bumpVersion('students'), bumpVersion('companies'), bumpVersion('openings')]);
+    await Promise.all([bumpVersion('students'), bumpVersion('companies'), bumpVersion('openings'), bumpVersion('analytics')]);
 
     return { _id: userId };
   }

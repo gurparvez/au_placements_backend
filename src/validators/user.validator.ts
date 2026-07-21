@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 const universityEnum = z.enum(['Akal University', 'Eternal University']);
+// Required for NIRF / NBA placement reporting.
+const genderEnum = z.enum(['male', 'female', 'other']);
 const rolesEnum = z.array(z.enum(['student', 'admin'])).nonempty('At least one role is required');
 
 export const createUserSchema = z.object({
@@ -11,6 +13,7 @@ export const createUserSchema = z.object({
   email: z.string().email('Invalid email format').optional(),
   phone: z.string().regex(/^\d{10,15}$/, 'Phone must be 10-15 digits').optional(),
   university: universityEnum,
+  gender: genderEnum.optional(),
   roles: rolesEnum.optional(),
 });
 
@@ -22,6 +25,7 @@ export const updateUserSchema = z
     email: z.string().email('Invalid email format').optional(),
     phone: z.string().regex(/^\d{10,15}$/, 'Phone must be 10-15 digits').optional(),
     university: universityEnum.optional(),
+    gender: genderEnum.optional(),
     roles: rolesEnum.optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {

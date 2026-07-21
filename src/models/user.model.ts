@@ -15,6 +15,7 @@ interface IUser extends Document {
   phone?: string;
 
   university?: 'Akal University' | 'Eternal University'; // students only
+  gender?: 'male' | 'female' | 'other'; // required for NIRF/NBA placement reporting
 
   roles: Role[];
   status: UserStatus;
@@ -62,6 +63,12 @@ const userSchema: Schema = new Schema(
       type: String,
       enum: ['Akal University', 'Eternal University'],
       required: false, // students only
+    },
+
+    gender: {
+      type: String,
+      enum: ['male', 'female', 'other'],
+      required: false,
     },
 
     roles: {

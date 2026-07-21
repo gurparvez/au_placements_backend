@@ -28,3 +28,13 @@ export const getCourseById = asyncHandler(async (req: Request, res: Response) =>
   const course = await courseService.getById(id);
   res.json({ success: true, data: course });
 });
+
+export const updateCourse = asyncHandler(async (req: Request, res: Response) => {
+  const course = await courseService.update(String(req.params.id), req.body);
+  res.json({ success: true, message: 'Course updated', data: course });
+});
+
+export const deleteCourse = asyncHandler(async (req: Request, res: Response) => {
+  const data = await courseService.remove(String(req.params.id));
+  res.json({ success: true, message: 'Course removed', data });
+});
